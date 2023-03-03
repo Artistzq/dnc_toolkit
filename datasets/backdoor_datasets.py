@@ -54,6 +54,10 @@ class PoisonedCIFAR10(torchvision.datasets.CIFAR10):
         # (The attacker can only poison the dataset)
         if index in self.poi_indices:
             target = self.trigger_handler.trigger_label
+            
+            if target == -1:
+                target = random.randint(0, self.classes-1)
+            
             img = self.trigger_handler.put_trigger(img)
 
         if self.transform is not None:

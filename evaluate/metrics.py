@@ -6,6 +6,7 @@ from thop import profile
 from . import reliability_diagrams as rd
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
+device = "cpu"
 
 classes = {
     "CIFAR10":('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
