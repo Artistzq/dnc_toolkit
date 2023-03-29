@@ -59,12 +59,17 @@ class AdaptiveWeightedKnowledgeDistillationLoss(KnowledgeDistillationLoss):
             T (int, optional): 交叉熵项的权重. Defaults to 4.
         """
         super().__init__(criterion, teacher, alpha, T)
-        assert method == "teacher" or method == "student" or method == "both"
+        # assert method == "teacher" or method == "student" or method == "both"
         self.method = method
+        self.calculated = False
+        self.all = []
     
-    def __cal_alpha__(self, outputs, reverse=False):
+    def __cal_alpha__(self, outputs, reverse=False, T_trans=False):
         # 根据样本计算对应的alpha
-        probs = torch.nn.functional.softmax(outputs, dim=-1).detach().cpu().numpy()
+        if T_trans:
+            probs = torch.nn.functional.softmax(outputs / self.T, dim=-1).detach().cpu().numpy()
+        else:
+            probs = torch.nn.functional.softmax(outputs, dim=-1).detach().cpu().numpy()
         entropy = -np.sum(probs * np.log(probs), axis=1) # 负号很重要
         if not reverse:
             alpha_batch = 1 - entropy / np.log(probs.shape[1])
@@ -74,6 +79,12 @@ class AdaptiveWeightedKnowledgeDistillationLoss(KnowledgeDistillationLoss):
         alpha_batch = torch.clip(alpha_batch, 0, 1)
         return alpha_batch
     
+    def __cal_dif__(self, outputs):
+        probs = torch.nn.functional.softmax(outputs / self.T, dim=-1).detach()
+        values, _ = torch.topk(probs, 2, dim=1) # 返回每一行的最大值和次大值及其索引
+        diff = values[:, 0] - values[:, 1]
+        return diff
+        
     def __call__(self, outputs, targets):
         if self.teacher is not None:
             
@@ -82,8 +93,25 @@ class AdaptiveWeightedKnowledgeDistillationLoss(KnowledgeDistillationLoss):
                 alpha_batch = self.__cal_alpha__(teacher_outputs)
             elif self.method == "student":
                 alpha_batch = self.__cal_alpha__(outputs, reverse=True)
-            else:
+            elif self.method == "teacher_rev":
+                alpha_batch = self.__cal_alpha__(teacher_outputs, reverse=True)
+            elif self.method == "student_rev":
+                alpha_batch = self.__cal_alpha__(outputs)
+            elif self.method == "both":
                 alpha_batch = (self.__cal_alpha__(teacher_outputs) + self.__cal_alpha__(outputs, reverse=True)) / 2
+            elif self.method == "both_rev":
+                alpha_batch = (self.__cal_alpha__(teacher_outputs, reverse=True) + self.__cal_alpha__(outputs)) / 2
+            elif self.method == "ultimate":
+                diff = self.__cal_dif__(teacher_outputs)
+                alpha_batch = diff * (1 - diff) * 4
+                alpha_batch = torch.clip(alpha_batch, 0, 1)
+                # print(diff)
+                self.all.append(diff)
+            elif self.method == "teacher_T":
+                alpha_batch = self.__cal_alpha__(teacher_outputs, reverse=True, T_trans=True)
+            else:
+                assert False, "No Method."
+            # print(alpha_batch)
             loss = self.kd_loss(outputs, targets, teacher_outputs, alpha_batch, self.T)
         else:
             loss = self.criterion(outputs, targets)
