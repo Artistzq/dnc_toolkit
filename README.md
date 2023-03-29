@@ -1,2 +1,2 @@
 # dnc_toolkit
-Deep Network Compress Tookit for Paper
+Deep Network Compress Toolkit for Paper
