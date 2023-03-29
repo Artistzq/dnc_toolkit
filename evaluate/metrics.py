@@ -217,7 +217,20 @@ class Metric():
         macs, params = profile(model, inputs=(input, ), verbose=False)
         macs = macs / 1048576 / 1024
         params = params / 1048576
-        return round(macs, 2), round(params, 2)
+        return round(macs, 2)
+    
+    @classmethod
+    def flops(cls, model, input_shape):
+        """
+        input_shape: (3, 32, 32)
+        """
+        input = torch.randn(1, input_shape[0], input_shape[1], input_shape[2])
+        model.to("cpu")
+        input.to("cpu")
+        macs, params = profile(model, inputs=(input, ), verbose=False)
+        macs = macs / 1048576 / 1024
+        params = params / 1048576
+        return round(macs*2, 2), round(params, 2)
     
     def acc(self, model):
         return _acc(model, self.testloader)
