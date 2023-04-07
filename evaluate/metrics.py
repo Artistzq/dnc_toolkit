@@ -85,7 +85,7 @@ def _ece(model, data_loader, num_bins=10, gen_fig=False, title=None):
     else:
         return bin_data
 
-
+@DeprecationWarning
 def __compute_calibration(true_labels, pred_labels, confidences, num_bins=10):
     """无用"""
     assert(len(confidences) == len(pred_labels))
@@ -203,8 +203,10 @@ def _apfd(model, data_loader):
 
 
 class Metric():
-    def __init__(self, dataset, dataloader, num_class) -> None:
+    def __init__(self, dataset, dataloader, num_class, use_gpu=True) -> None:
         self.testset, self.testloader, self.num_class = dataset, dataloader, num_class
+        self.use_gpu = use_gpu
+        self.device = "cuda" if use_gpu else "cpu"
     
     @classmethod
     def macs(cls, model, input_shape):
