@@ -175,31 +175,33 @@ class PoisonArgs:
 
 class CIFAR10(CVD.CIFAR10):
     
-    def __init__(self, poison_args, batch_size=128, num_workers=4, augmented=True):
-        super(CIFAR10, self).__init__(batch_size, num_workers, augmented)
+    def __init__(self, poison_args, batch_size=128, num_workers=4, augmented=True, root='./data', normalization=None):
+        super(CIFAR10, self).__init__(batch_size, num_workers, augmented, normalization=normalization)
         
-        self.trainset = PoisonedCIFAR10(poison_args, root='./data', train=True, download=False, transform=self.augmented)
-        self.testset = PoisonedCIFAR10(poison_args, root='./data', train=False, download=False, transform=self.normalized)
+        self.trainset = PoisonedCIFAR10(poison_args, root=root, train=True, download=False, transform=self.augmented)
+        self.testset = PoisonedCIFAR10(poison_args, root=root, train=False, download=False, transform=self.normalized)
         
         self.set_loader()
     
 
 class CIFAR100(CVD.CIFAR100):
         
-    def __init__(self, poison_args, batch_size=128, num_workers=4, augmented=True):
-        super(CIFAR100, self).__init__(batch_size, num_workers, augmented)
+    def __init__(self, poison_args, batch_size=128, num_workers=4, augmented=True, root='./data', normalization=None):
+        super(CIFAR100, self).__init__(batch_size, num_workers, augmented, normalization=normalization)
         
-        self.trainset = PoisonedCIFAR100(poison_args, root='./data', train=True, download=False, transform=self.augmented)
-        self.testset = PoisonedCIFAR100(poison_args,root='./data', train=False, download=False, transform=self.normalized)
+        self.trainset = PoisonedCIFAR100(poison_args, root=root, train=True, download=False, transform=self.augmented)
+        self.testset = PoisonedCIFAR100(poison_args,root=root, train=False, download=False, transform=self.normalized)
         
         self.set_loader()
         
 
 class TinyImageNet(CVD.TinyImageNet):
     
-    def __init__(self, poison_args, batch_size=128, num_workers=4, augmented=True, train_dir = 'data/tiny-imagenet-200/train', valid_dir = 'data/tiny-imagenet-200/val/images'):
-        super(TinyImageNet, self).__init__(batch_size, num_workers, augmented)
+    def __init__(self, poison_args, batch_size=128, num_workers=4, augmented=True, root="./data", normalization=None):
+        super(TinyImageNet, self).__init__(batch_size, num_workers, augmented, normalization=normalization)
         
+        train_dir = os.path.join(root, '/tiny-imagenet-200/train')
+        valid_dir = os.path.join(root, '/tiny-imagenet-200/val/images')
         self.trainset = PoisonedImageFolder(poison_args, train_dir, train=True, transform=self.augmented)
         self.testset = PoisonedImageFolder(poison_args, valid_dir, train=False, transform=self.normalized)
         
