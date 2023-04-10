@@ -200,8 +200,8 @@ class TinyImageNet(CVD.TinyImageNet):
     def __init__(self, poison_args, batch_size=128, num_workers=4, augmented=True, root="./data", normalization=None):
         super(TinyImageNet, self).__init__(batch_size, num_workers, augmented, normalization=normalization)
         
-        train_dir = os.path.join(root, '/tiny-imagenet-200/train')
-        valid_dir = os.path.join(root, '/tiny-imagenet-200/val/images')
+        train_dir = os.path.join(root, 'tiny-imagenet-200/train')
+        valid_dir = os.path.join(root, 'tiny-imagenet-200/val/images')
         self.trainset = PoisonedImageFolder(poison_args, train_dir, train=True, transform=self.augmented)
         self.testset = PoisonedImageFolder(poison_args, valid_dir, train=False, transform=self.normalized)
         

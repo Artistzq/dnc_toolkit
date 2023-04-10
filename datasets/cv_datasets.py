@@ -94,8 +94,8 @@ class TinyImageNet(Dataset):
         if not augmented:
             self.augmented = self.normalized
         
-        train_dir = os.path.join(root, '/tiny-imagenet-200/train')
-        valid_dir = os.path.join(root, '/tiny-imagenet-200/val/images')
+        train_dir = os.path.join(root, 'tiny-imagenet-200/train')
+        valid_dir = os.path.join(root, 'tiny-imagenet-200/val/images')
         self.trainset =  datasets.ImageFolder(train_dir, transform=self.augmented)
         self.testset =  datasets.ImageFolder(valid_dir, transform=self.normalized)
         self.set_loader()
