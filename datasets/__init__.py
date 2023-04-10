@@ -2,7 +2,7 @@
 from . import cv_datasets as CVD
 from . import backdoor_datasets as BKD
 from .backdoor_datasets import PoisonArgs
-
+from .ood_datasets import get_c_dataset as get_corrupt_dataset
 
 def get_dataset(dataset_name, batch_size=128, augmented=True, num_workers=4, root="./data", normalization=None):
     print("======> Get Clean Data: {}".format(dataset_name))
