@@ -41,10 +41,10 @@ def generate_disagreements(image_loader, attack):
 
     Args:
         image_loader (_type_): _description_
-        attack (_type_): _description_
+        attack (_type_): 接受的输入是：(N, C, H, W)或(C, H ,W)，这个方法传的都是(N, C, H, W)
 
     Returns:
-        _type_: _description_
+        _type_: (images(shape=(num, C, H, W)), lables)
     """
     adv_images = []
     raw_labels = []

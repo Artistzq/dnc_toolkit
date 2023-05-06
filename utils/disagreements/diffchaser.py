@@ -149,13 +149,13 @@ class DiffChaser:
         for generation in range(iteration):
             if self.timeout > 0 and time.perf_counter() - start > self.timeout:
                 if self.verbose:
-                    print("Failed. Can not find any disagreements in limit time {}s. Return mutated.".format(self.timeout))
+                    print("Failed. Can not find any disagreements in limit time {:.3f} seconds. Return mutated.".format(self.timeout))
                 return population[0]
             
             for sample in population:
                 if not self.agree(sample):
                     if self.verbose:
-                        print("Successed. Quit before gen {} with a disagreement. Return Mutated.".format(generation))
+                        print("Successed. Quit before gen {} with a disagreement in {:.3f} seconds.".format(generation, (time.perf_counter() - start)))
                     return sample
             
             pop1 = self.tournament_select(population, self.model1, len(population) // 2, 4)
@@ -181,7 +181,18 @@ class DiffChaser:
         return population[0]
     
     def __call__(self, x, *args, **kwargs):
+        """
+        Args:
+            x (_type_): 接受的输入是：(N, C, H, W)或(C, H ,W)
+
+        Raises:
+            ValueError: _description_
+
+        Returns:
+            _type_: _description_
+        """
         assert isinstance(x, torch.Tensor), "x need to be torch.Tensor."
+        start = time.perf_counter()
         if x.ndim == 4:
             result = []
             for single_x in x:
@@ -191,4 +202,6 @@ class DiffChaser:
             result = self.genetic_algorithm(x)
         else:
             raise ValueError()
+        if self.verbose:
+            print("Time cosumption: {:.3f} s".format(time.perf_counter() - start))
         return result

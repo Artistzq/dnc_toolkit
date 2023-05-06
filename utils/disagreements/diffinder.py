@@ -44,6 +44,13 @@ class Diffinder(Attack):
     def forward(self, images, labels):
         r"""
         Overridden.
+
+        Args:
+            images (_type_): 接受的输入是：(N, C, H, W)或(C, H ,W)
+            labels (_type_): 
+            
+        Returns:
+            _type_: _description_
         """
         images = images.clone().detach().to(self.device)
         labels = labels.clone().detach().to(self.device)
