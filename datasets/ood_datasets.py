@@ -29,10 +29,10 @@ full_categories = [
 ]
 
 
-def get_c_dataset(root, dataset_name, serverity, as_loader=True, ood_categories=None, batch_size=100, normalization=None):
+def get_corrupt_dataset(root, dataset_name, serverity, as_loader=True, ood_categories=None, batch_size=100, normalization=None):
     """
     1. 获取全部数据集，以loader形式
-    >>> test_loaders = get_c_dataset(root="./data", dataset_name="CIFAR10", serverity=1, batch_size=128)
+    >>> test_loaders = get_corrupt_dataset(root="./data", dataset_name="CIFAR10", serverity=1, batch_size=128)
     >>> test_loaders.keys()
     >>> dict_keys(['jpeg_compression', 'shot_noise', 'elastic_transform', 'glass_blur', 'zoom_blur', 
             'impulse_noise', 'speckle_noise', 'pixelate', 'motion_blur', 'gaussian_blur', 'frost', 
@@ -43,7 +43,7 @@ def get_c_dataset(root, dataset_name, serverity, as_loader=True, ood_categories=
     >>> (torch.Size([128, 3, 32, 32]), torch.Size([128]))
     
     2. 获取指定污染类型的数据集，以Torch Dataset形式
-    >>> test_sets = get_c_dataset(root="./data", dataset_name="TinyImageNet", serverity=2, as_loader=False,
+    >>> test_sets = get_corrupt_dataset(root="./data", dataset_name="TinyImageNet", serverity=2, as_loader=False,
                     ood_categories=["jpeg_compression","shot_noise"], normalization=self_normalization)
     >>> single_image, single_label = test_sets["jpeg_compression"][0], test_sets["jpeg_compression"][1] 
     >>> single_image.shape, single_label.shape
