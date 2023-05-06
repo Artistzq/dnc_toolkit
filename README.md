@@ -3,6 +3,7 @@ Deep Network Compress Toolkit for Paper
 
 ## 使用
 0. 架构
+``` bash
 project
 ├─ data
 │  ├─ cifar-10-batches-py
@@ -15,6 +16,7 @@ project
 │  └─ models
 ├─ 1.py
 └─ 2.py
+```
 
 1. 加载模型
 ``` python
