@@ -2,6 +2,20 @@
 Deep Network Compress Toolkit for Paper
 
 ## 使用
+0. 架构
+project
+├─ data
+│  ├─ cifar-10-batches-py
+│  ├─ ...
+│  └─ Tiny-ImageNet-C
+├─ toolkit
+│  ├─ datasets
+│  ├─ evaluate
+│  ├─ ...
+│  └─ models
+├─ 1.py
+└─ 2.py
+
 1. 加载模型
 ``` python
 from toolkit.models import get_network
