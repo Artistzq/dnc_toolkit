@@ -3,7 +3,10 @@ import torch
 from matplotlib import pyplot as plt
 import sklearn.metrics as sm
 from thop import profile
+import functools
 from . import reliability_diagrams as rd
+from ..utils.decorators import deprecated
+
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -40,20 +43,6 @@ def _class_acc(model, data_loader, num_class):
     return class_acc
 
 
-def _acc(model, data_loader):
-    model.eval()
-    model = model.to(device)
-    error = 0
-    total = 0
-    for X, y in data_loader:
-        with torch.no_grad():
-            X = X.to(device)
-            pred = model(X)
-            y = y.to(device)
-        diff = y - torch.argmax(pred, axis=-1)
-        error += diff.count_nonzero().item()
-        total += y.numel()
-    return 1 - (error / total)
 
 
 def _ece(model, data_loader, num_bins=10, gen_fig=False, title=None):
@@ -85,7 +74,7 @@ def _ece(model, data_loader, num_bins=10, gen_fig=False, title=None):
     else:
         return bin_data
 
-@DeprecationWarning
+@deprecated
 def __compute_calibration(true_labels, pred_labels, confidences, num_bins=10):
     """无用"""
     assert(len(confidences) == len(pred_labels))
@@ -205,8 +194,29 @@ def _apfd(model, data_loader):
 class Metric():
     def __init__(self, dataset, dataloader, num_class, use_gpu=True) -> None:
         self.testset, self.testloader, self.num_class = dataset, dataloader, num_class
-        self.use_gpu = use_gpu
         self.device = "cuda" if use_gpu else "cpu"
+    
+    def check_and_convert(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            models = [arg for arg in args if isinstance(arg, torch.nn.Module)]
+            models.extend([arg for arg in kwargs.values() if isinstance(arg, torch.nn.Module)])
+            is_training = [model.training for model in models]
+            
+            for i, model in enumerate(models):
+                model = model.to(self.device)
+                if is_training[i]:
+                    model.eval()
+            
+            with torch.no_grad():
+                ans = func(self, *args, **kwargs)
+            
+            for i, model in enumerate(models):
+                if is_training[i]:
+                    model.train()
+                    
+            return ans
+        return wrapper
     
     @classmethod
     def macs(cls, model, input_shape):
@@ -234,13 +244,40 @@ class Metric():
         params = params / 1048576
         return round(macs*2, 2), round(params, 2)
     
-    def acc(self, model):
-        return _acc(model, self.testloader)
+    @check_and_convert
+    def accuracy(self, model):
+        """返回模型在test_loader上的的准确率
+        Args:
+            model (torch.nn.Module): 模型
+        Returns:
+            int: 准确率∈[0, 1]
+        """
+        error = 0
+        total = 0
+        for X, y in self.testloader:
+            X = X.to(self.device)
+            pred = model(X)
+            y = y.to(self.device)
+            diff = y - torch.argmax(pred, axis=-1)
+            error += diff.count_nonzero().item()
+            total += y.numel()
+        return 1 - (error / total)
     
+    @deprecated(reason="It is not recommended to use this method as the name 'acc' is not standardized.", new="Metric.accuracy")
+    def acc(self, model):
+        return self.accuracy(model)
+
     def class_acc(self, model):
         class_acc = _class_acc(model, self.testloader, self.num_class)
         return class_acc[:, 2].tolist()
 
+    def expect_calibration_error(self, model, num_bins=-1):
+        if num_bins < 0:
+            num_bins = self.num_class
+        bin_data = _ece(model, self.testloader, num_bins)
+        return bin_data["expected_calibration_error"]
+
+    @deprecated(new="Metric.expect_calibration_error")
     def ece(self, model, num_bins=-1, save_path=None, return_full=False):
         if num_bins < 0:
             num_bins = self.num_class
