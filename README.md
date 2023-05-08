@@ -80,7 +80,8 @@ Returns:
 ```
 4. 模型不确定性度量
 ``` python
-from toolkit.evaluate.uncertainty import Uncertainty
+# from toolkit.evaluate.uncertainty import Uncertainty
+from toolkit.evaluate import Uncertainty
 
 logits = resnet110(X)
 probs = torch.softmax(logits, dim=-1)
@@ -92,15 +93,20 @@ margin = Uncertainty.margin(probs)
 ```
 5. 模型性能评估（待重构）
 ``` python
-from toolkit.evaluate.metrics import Metric
+# from toolkit.evaluate.metrics import Metric
+from toolkit.evaluate import Metric
 
 metric = Metric(dataset, dataset.test_loader, 10, use_gpu=True)
 # 实用：
 metric = Metric(None, test_loader, num_class=10)
 
 print("flops and params: ", Metric.flops(resnet110, input_shape=(3, 32, 32)))
+# deprecated
 print(metric.acc(resnet110))
 print(metric.ece(resnet110))
+
+print(metric.accuracy(resnet110))
+print(metric.expect_calibration_error(resnet110))
 # 其他指标阅读源码
 
 ```
