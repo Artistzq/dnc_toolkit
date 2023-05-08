@@ -250,7 +250,7 @@ class Metric():
         Args:
             model (torch.nn.Module): 模型
         Returns:
-            int: 准确率∈[0, 1]
+            float: 准确率∈[0, 1]
         """
         error = 0
         total = 0
@@ -267,17 +267,129 @@ class Metric():
     def acc(self, model):
         return self.accuracy(model)
 
+    @check_and_convert
+    def class_accuracy(self, model):
+        """计算每个类别的准确率
+        Args:
+            model (torch.nn.Module): 模型
+        Returns:
+            np.ndarray: shape(num_class, )，每个类别上的准确率
+        """
+        model.eval()
+        model = model.to(device)
+        class_acc = np.zeros((self.num_class, 3))
+        for X, y in self.testloader:
+            with torch.no_grad():
+                X = X.to(device)
+                pred = model(X)
+            y_hat = torch.argmax(pred, axis=-1).cpu().detach().numpy()
+            y = y.cpu().detach().numpy()
+            total_class_cnts = np.bincount(y_hat, minlength=self.num_class)
+            correct_labels = y_hat[np.where(y_hat == y)]
+            correct_class_cnts = np.bincount(correct_labels, minlength=self.num_class)
+            class_acc[:, 0] += correct_class_cnts
+            class_acc[:, 1] += total_class_cnts
+        class_acc[:, 2] = class_acc[:, 0] / class_acc[:, 1] * 100
+        return class_acc
+    
+    @deprecated(reason="It is not recommended to use this method as the name 'class_acc' is not standardized.", new="Metric.class_accuracy")
     def class_acc(self, model):
-        class_acc = _class_acc(model, self.testloader, self.num_class)
-        return class_acc[:, 2].tolist()
+        return self.class_accuracy(model)
 
+    @check_and_convert
     def expect_calibration_error(self, model, num_bins=-1):
+        """计算模型在testloader上的校准率
+
+        Args:
+            model (torch.nn.Module): 模型
+            num_bins (int, optional): 分桶数. Defaults to -1, which means num_class.
+
+        Returns:
+            float: 校准率
+        """
         if num_bins < 0:
             num_bins = self.num_class
-        bin_data = _ece(model, self.testloader, num_bins)
-        return bin_data["expected_calibration_error"]
+        
+        true_labels = []
+        pred_labels = []
+        confidences = []
+        for X, y in self.testloader:
+            X = X.to(self.device)
+            y = y.to(self.device)
+            true_labels.append(y)
+            pred = model(X)
+            pred_labels.append(torch.argmax(pred, axis=-1))
+            confidences.append(torch.max(torch.softmax(pred, dim=-1), dim=-1)[0])
+        true_labels = torch.cat(true_labels).cpu().detach().numpy()
+        pred_labels = torch.cat(pred_labels).cpu().detach().numpy()
+        confidences = torch.cat(confidences).cpu().detach().numpy()
+        
+        assert(len(confidences) == len(pred_labels))
+        assert(len(confidences) == len(true_labels))
+        assert(num_bins > 0)
 
-    @deprecated(new="Metric.expect_calibration_error")
+        bins = np.linspace(0.0, 1.0, num_bins + 1)
+        indices = np.digitize(confidences, bins, right=True)
+
+        bin_accuracies = np.zeros(num_bins, dtype=np.float)
+        bin_confidences = np.zeros(num_bins, dtype=np.float)
+        bin_counts = np.zeros(num_bins, dtype=np.int)
+        for b in range(num_bins):
+            selected = np.where(indices == b + 1)[0]
+            if len(selected) > 0:
+                bin_accuracies[b] = np.mean(true_labels[selected] == pred_labels[selected])
+                bin_confidences[b] = np.mean(confidences[selected])
+                bin_counts[b] = len(selected)
+        gaps = np.abs(bin_accuracies - bin_confidences)
+        ece = np.sum(gaps * bin_counts) / np.sum(bin_counts)
+        return ece
+    
+    @check_and_convert
+    def full_ece(self, model, num_bins=-1):
+        """Collects predictions into bins used to draw a reliability diagram.
+
+        Arguments:
+            true_labels: the true labels for the test examples
+            pred_labels: the predicted labels for the test examples
+            confidences: the predicted confidences for the test examples
+            num_bins: number of bins
+
+        The true_labels, pred_labels, confidences arguments must be NumPy arrays;
+        pred_labels and true_labels may contain numeric or string labels.
+
+        For a multi-class model, the predicted label and confidence should be those
+        of the highest scoring class.
+
+        Returns a dictionary containing the following NumPy arrays:
+            accuracies: the average accuracy for each bin
+            confidences: the average confidence for each bin
+            counts: the number of examples in each bin
+            bins: the confidence thresholds for each bin
+            avg_accuracy: the accuracy over the entire test set
+            avg_confidence: the average confidence over the entire test set
+            expected_calibration_error: a weighted average of all calibration gaps
+            max_calibration_error: the largest calibration gap across all bins
+        """
+        if num_bins < 0:
+            num_bins = self.num_class
+        
+        true_labels = []
+        pred_labels = []
+        confidences = []
+        for X, y in self.testloader:
+            X = X.to(self.device)
+            y = y.to(self.device)
+            true_labels.append(y)
+            pred = model(X)
+            pred_labels.append(torch.argmax(pred, axis=-1))
+            confidences.append(torch.max(torch.softmax(pred, dim=-1), dim=-1)[0])
+        true_labels = torch.cat(true_labels).cpu().detach().numpy()
+        pred_labels = torch.cat(pred_labels).cpu().detach().numpy()
+        confidences = torch.cat(confidences).cpu().detach().numpy()
+        
+        return rd.compute_calibration(true_labels, pred_labels, confidences, num_bins)
+
+    @deprecated(reason="It is not recommended to use this method as the name 'ece' is not standardized.", new="Metric.expect_calibration_error")
     def ece(self, model, num_bins=-1, save_path=None, return_full=False):
         if num_bins < 0:
             num_bins = self.num_class

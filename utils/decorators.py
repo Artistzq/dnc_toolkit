@@ -21,7 +21,7 @@ def deprecated(reason=None, new=None):
     def decorator(func):
         @wraps(func)
         def new_func(*args, **kwargs):
-            message = "Call to deprecated function {}.".format(func.__name__)
+            message = "Call to deprecated function '{}'.".format(func.__name__)
             if reason:
                 message += "\n{}".format(reason)
             if new:
