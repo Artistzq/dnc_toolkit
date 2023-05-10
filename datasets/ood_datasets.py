@@ -3,6 +3,7 @@ import os
 from torch.utils.data import TensorDataset, DataLoader
 from torchvision.datasets import ImageFolder
 from torchvision.transforms import Normalize, ToTensor
+from torchvision import transforms
 import torch
 
 
@@ -29,8 +30,10 @@ full_categories = [
 ]
 
 
-def get_corrupt_dataset(root, dataset_name, serverity, as_loader=True, ood_categories=None, batch_size=100, normalization=None):
+def get_corrupt_dataset(root, dataset_name, serverity, 
+                        as_loader=True, ood_categories=None, batch_size=100, normalization=None, augmented=False):
     """
+    TODO: 提供数据增强
     1. 获取全部数据集，以loader形式
     >>> test_loaders = get_corrupt_dataset(root="./data", dataset_name="CIFAR10", serverity=1, batch_size=128)
     >>> test_loaders.keys()
@@ -81,9 +84,9 @@ def get_corrupt_dataset(root, dataset_name, serverity, as_loader=True, ood_categ
     
     # 获取数据集
     if dataset_name == 'CIFAR100':
-        test_sets = get_cifar_c_dataset(root, "CIFAR-100-C", serverity, ood_categories, normalizer)
+        test_sets = get_cifar_c_dataset(root, "CIFAR-100-C", serverity, ood_categories, normalizer, augmented)
     elif dataset_name == 'CIFAR10':
-        test_sets = get_cifar_c_dataset(root, "CIFAR-10-C", serverity, ood_categories, normalizer)
+        test_sets = get_cifar_c_dataset(root, "CIFAR-10-C", serverity, ood_categories, normalizer, augmented)
     elif dataset_name == "TinyImageNet":
         test_sets = get_tinyimagenet_c_dataset(root, serverity, ood_categories, normalizer)
     else:
@@ -110,7 +113,20 @@ def get_tinyimagenet_c_dataset(root, serverity, ood_categories, normalizer):
     return test_sets
 
 
-def get_cifar_c_dataset(root, dataset_name, serverity, ood_categories, normalizer):
+def get_cifar_c_dataset(root, dataset_name, serverity, ood_categories, normalizer, augmented):
+    
+    transform_train = transforms.Compose([
+        transforms.ToPILImage(),
+        transforms.RandomCrop(32, padding=4),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+    ])
+
+    transform_test = transforms.Compose([
+        transforms.ToTensor(),
+    ])
+
+    
     test_sets = {}
     dataset_path = os.path.join(root, dataset_name)
     labels = np.load(os.path.join(dataset_path, "labels.npy"))[(serverity-1)*10000: serverity*10000]
@@ -123,11 +139,17 @@ def get_cifar_c_dataset(root, dataset_name, serverity, ood_categories, normalize
         test_image = images
         test_label = labels
         
-        test_image = [ToTensor()(image) for image in test_image]
+        # 数据增强
+        if augmented:
+            test_image = [transform_train(image) for image in test_image]
+        else:
+            test_image = [transform_test(image) for image in test_image]
+            
+        
         test_image = torch.stack(test_image)
         # test_image = test_image.permute(0,3,1,2)
         test_image = normalizer(test_image)
-        test_label = torch.from_numpy(test_label).float()
+        test_label = torch.from_numpy(test_label)
         
         test_dataset = TensorDataset(test_image, test_label)
         
