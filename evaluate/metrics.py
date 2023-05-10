@@ -191,17 +191,26 @@ def _apfd(model, data_loader):
     return 1 - error_order_sum / (total * error) + 1 / (2 * total)
 
 
-class Metric():
+class Metric:
     def __init__(self, dataset, dataloader, num_class, use_gpu=True) -> None:
         self.testset, self.testloader, self.num_class = dataset, dataloader, num_class
         self.device = "cuda" if use_gpu else "cpu"
     
     def check_and_convert(func):
+        """在执行func函数前检查并转换模型，包括：
+        1. 模型转化为eval模式
+        2. 模型转到指定device
+        func执行结束后再转换回原来的状态
+
+        Args:
+            func (函数): Metric类下的函数
+        """
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
             models = [arg for arg in args if isinstance(arg, torch.nn.Module)]
             models.extend([arg for arg in kwargs.values() if isinstance(arg, torch.nn.Module)])
             is_training = [model.training for model in models]
+            devices = [next(model.parameters()).device for model in models]
             
             for i, model in enumerate(models):
                 model = model.to(self.device)
@@ -212,6 +221,7 @@ class Metric():
                 ans = func(self, *args, **kwargs)
             
             for i, model in enumerate(models):
+                model = model.to(devices[i])
                 if is_training[i]:
                     model.train()
                     
@@ -219,31 +229,50 @@ class Metric():
         return wrapper
     
     @classmethod
-    def macs(cls, model, input_shape):
+    def computational_workload_of_model(cls, model, input_shape, unit="MB"):
+        """返回模型的FLOPs和Params的大小.
+        类似但专用的函数包括: Metric.macs, Metric.flops, Metric.params
+
+        Args:
+            model (nn.Module): 模型
+            input_shape (tuple or list): 单个样本的形状，如(3, 32, 32)
+            unit (str, optional): 大小单位. Defaults to "MB".
+
+        Returns:
+            Tuple[float]: 返回(FLOPs, Params)
         """
-        input_shape: (3, 32, 32)
-        """
-        input = torch.randn(1, input_shape[0], input_shape[1], input_shape[2])
+        input = torch.randn((1, ) + input_shape)
         model.to("cpu")
         input.to("cpu")
         macs, params = profile(model, inputs=(input, ), verbose=False)
-        macs = macs / 1048576 / 1024
-        params = params / 1048576
-        return round(macs, 2)
-    
+
+        if unit == "KB":
+            macs /= 1024
+            params /= 1024
+        elif unit == "MB":
+            macs /= 1048576
+            params /= 1048576
+        elif unit == "GB":
+            macs /= 1048576 * 1024
+            params /= 1048576 * 1024
+        return round(macs*2, 3), round(params, 3)
+
     @classmethod
-    def flops(cls, model, input_shape):
-        """
-        input_shape: (3, 32, 32)
-        """
-        input = torch.randn(1, input_shape[0], input_shape[1], input_shape[2])
-        model.to("cpu")
-        input.to("cpu")
-        macs, params = profile(model, inputs=(input, ), verbose=False)
-        macs = macs / 1048576 / 1024
-        params = params / 1048576
-        return round(macs*2, 2), round(params, 2)
-    
+    def macs(cls, model, input_shape, unit="MB"):
+        
+        double_macs, _ = cls.computational_workload_of_model(model, input_shape, unit)
+        return round(double_macs / 2, 2)
+
+    @classmethod
+    def flops(cls, model, input_shape, unit="MB"):
+        flops, _ = cls.computational_workload_of_model(model, input_shape, unit)
+        return flops
+
+    @classmethod
+    def params(cls, model, input_shape, unit="MB"):
+        _, params = cls.computational_workload_of_model(model, input_shape, unit)
+        return params
+
     @check_and_convert
     def accuracy(self, model):
         """返回模型在test_loader上的的准确率
