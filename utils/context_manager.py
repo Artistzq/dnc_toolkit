@@ -8,11 +8,15 @@ class Timer:
             # 计算代码块执行的时间
             with Timer(time_unit="ms", verbose=True) as timer:
                 time.sleep(1)
+            print(timer.get_elapsed_time())
             # -----------------------------------
             # Output:
             # Time elapsed: 1001.041 ms
+            # 1001.041
             # -----------------------------------
-            print(time.get)
+            或
+            with Timer(time_unit="ms", verbose=True):
+                time.sleep(1)
             # -----------------------------------
             # Output:
             # 1001.041
