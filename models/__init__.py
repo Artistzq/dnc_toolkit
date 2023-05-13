@@ -50,6 +50,26 @@ from .stochasticdepth import stochastic_depth_resnet50
 from .stochasticdepth import stochastic_depth_resnet101
 
 
+from . import models_with_adapter as ada
+
+def get_ada_network(net, num_class, adapter=None, gpu=True):
+    if net == "resnet20":
+        net = ada.resnet20(num_class, adapter)
+    elif net == "resnet110":
+        net = ada.resnet110(num_class, adapter)
+    elif 'WRN' in net:
+        _, depth, widen_factor = net.split("-")
+        depth = int(depth)
+        widen_factor = int(widen_factor)
+        net = ada.wideresnet(num_class, depth, widen_factor)
+    elif net == "resnet18":
+        net = ada.resnet18(num_class)
+    
+    if gpu == True:
+        net = net.to("cuda")
+    return net
+
+
 def get_network(net, num_class, gpu=None):
     """ return given network
     """
