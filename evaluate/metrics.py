@@ -296,6 +296,16 @@ class ModelMetric:
         _, params = cls.computational_workload_of_model(model, input_shape, unit)
         return params
 
+    @check_and_convert
+    def get_probs(self, model, temperature=1):
+        probs = []
+        for X, y in self.testloader:
+            X = X.to(self.device)
+            logits = model(X)
+            prob = torch.softmax(logits / temperature, dim=-1)
+            probs.append(prob)
+        return torch.cat(probs)
+    
     @limit_demical_places
     @check_and_convert
     def accuracy(self, model):
