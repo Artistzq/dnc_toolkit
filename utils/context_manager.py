@@ -39,6 +39,8 @@ class Timer:
     
     def __enter__(self):
         self.start_time = time.time()
+        if self.verbose:
+            print(f"Task [{str(self.task)}] started")
         return self
     
     def __exit__(self, exc_type, exc_val, exc_tb):
