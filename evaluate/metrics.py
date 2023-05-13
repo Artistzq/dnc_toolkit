@@ -192,9 +192,18 @@ def _apfd(model, data_loader):
 
 
 class Metric:
-    def __init__(self, dataset, dataloader, num_class, use_gpu=True) -> None:
+    def __init__(self, dataset, dataloader, num_class, use_gpu=True, decimal_places=2) -> None:
         self.testset, self.testloader, self.num_class = dataset, dataloader, num_class
         self.device = "cuda" if use_gpu else "cpu"
+        self.decimal_places = decimal_places
+    
+    def limit_demical_places(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            result = func(self, *args, **kwargs)
+            result = round(result, self.decimal_places)
+            return result
+        return wrapper
     
     def check_and_convert(func):
         """在执行func函数前检查并转换模型，包括：
@@ -273,6 +282,7 @@ class Metric:
         _, params = cls.computational_workload_of_model(model, input_shape, unit)
         return params
 
+    @limit_demical_places
     @check_and_convert
     def accuracy(self, model):
         """返回模型在test_loader上的的准确率
@@ -325,6 +335,8 @@ class Metric:
     def class_acc(self, model):
         return self.class_accuracy(model)
 
+    
+    @limit_demical_places
     @check_and_convert
     def expect_calibration_error(self, model, num_bins=-1):
         """计算模型在testloader上的校准率
@@ -438,6 +450,7 @@ class Metric:
         else:
             return bin_data["expected_calibration_error"]
 
+    @limit_demical_places
     def nfr(self, model1, model2):
         return _nfr(model1, model2, self.testloader)
 
