@@ -191,11 +191,22 @@ def _apfd(model, data_loader):
     return 1 - error_order_sum / (total * error) + 1 / (2 * total)
 
 
-class Metric:
-    def __init__(self, dataset, dataloader, num_class, use_gpu=True, decimal_places=2) -> None:
-        self.testset, self.testloader, self.num_class = dataset, dataloader, num_class
+class ModelMetric:
+    def __init__(self, dataloader, use_gpu=True, decimal_places=4) -> None:
+        self.testloader = dataloader
         self.device = "cuda" if use_gpu else "cpu"
         self.decimal_places = decimal_places
+        self.num_class = None
+    
+    def get_num_class(self, model):
+        if (self.num_class is None):
+            # print("根据模型计算类")
+            for X, y in self.testloader:
+                X = X.to(next(model.parameters()).device)
+                logits = model(X)
+                self.num_class = logits.shape[1]
+                break
+        return self.num_class
     
     def limit_demical_places(func):
         @functools.wraps(func)
@@ -226,6 +237,9 @@ class Metric:
                 if is_training[i]:
                     model.eval()
             
+            # 根据模型更新类别数
+            self.get_num_class(models[0])
+
             with torch.no_grad():
                 ans = func(self, *args, **kwargs)
             
@@ -450,9 +464,36 @@ class Metric:
         else:
             return bin_data["expected_calibration_error"]
 
-    @limit_demical_places
+    @deprecated(new="Metric.negatice_flip_rate")
     def nfr(self, model1, model2):
-        return _nfr(model1, model2, self.testloader)
+        return self.negative_flip_rate(model1, model2)
+
+    @limit_demical_places
+    @check_and_convert
+    def negative_flip_rate(self, model1, model2):
+        """计算model1和model2之间的负翻转率
+        Args:
+            model1 (_type_): _description_
+            model2 (_type_): _description_
+        Returns:
+            _type_: 负翻转率∈[0,1]
+        """
+        vals = []
+        total = 0
+        for X, y in self.testloader:
+            X = X.to(device)
+            y = y.to(device)
+            logits1 = model1(X)
+            logits2 = model2(X)
+            pred1 = torch.argmax(logits1, axis=-1)
+            pred2 = torch.argmax(logits2, axis=-1)
+            correct_h1 = pred1.eq(y)
+            wrong_h2 = ~pred2.eq(y)
+            negative_flip = wrong_h2.masked_select(correct_h1)
+            val = negative_flip.count_nonzero()
+            vals.append(val.item())
+            total += y.numel()
+        return sum(vals) / total
 
     def clever(self, model, num_cases=100):
         
@@ -525,3 +566,13 @@ class Metric:
         ece = _ece(model, new_loader)["expected_calibration_error"]
         return round(apfd*100, 2)
         # return {"apfd": round(apfd*100, 2), "acc": round(100*acc, 2), "ece": round(ece*100, 2)}
+        
+    
+class Metric(ModelMetric):
+    @deprecated(reason=
+                "The design of the constructor for this class is inappropriate. \n Use 'toolkit.evaluate.ModelMetric' instead.",
+                new="toolkit.evaluate.ModelMetric")
+    def __init__(self, dataset, dataloader, num_class, use_gpu=True, decimal_places=4) -> None:
+        self.dataset = dataset
+        self.num_class = num_class
+        super().__init__(dataloader, use_gpu, decimal_places)

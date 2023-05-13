@@ -1,2 +1,2 @@
-from .metrics import Metric
+from .metrics import Metric, ModelMetric
 from .uncertainty import Uncertainty

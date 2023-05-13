@@ -23,7 +23,7 @@ def deprecated(reason=None, new=None):
         def new_func(*args, **kwargs):
             message = "Call to deprecated function '{}'.".format(func.__name__)
             if reason:
-                message += "\n{}".format(reason)
+                message += "\nThis method is deprecated now because of '{}'".format(reason)
             if new:
                 message += "\nUse '{}' instead.".format(new)
             warnings.warn(message,
