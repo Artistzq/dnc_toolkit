@@ -1,7 +1,5 @@
 import numpy as np
 from torch.utils.data import DataLoader, Dataset
-from ..evaluate import Uncertainty
-from ..evaluate import ModelMetric
 from . import wrapper
 
 class Selector:
@@ -25,30 +23,26 @@ class UncertaintyBasedSelector(Selector):
         )(model_ori).select(dataset, k, 4)
       
     """
-    def __init__(self, model) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self.model = model
-        self.func = None
     
     def select(self, datasource, k, T=1):
         if isinstance(datasource, Dataset):
             datasource: DataLoader = wrapper.dataset_to_loader(datasource)
+            
+        values = self.get_uncertainty(datasource)
         
-        metric = ModelMetric(datasource)
-        metric.device = next(self.model.parameters())
-        probs = metric.get_probs(self.model, temperature=T)
-        
-        values = self.get_uncertainty(probs)
         indices = np.argsort(values)
         return indices[: k]
         
-    def get_uncertainty(self, probs):
+    def get_uncertainty(self, datasource):
         raise NotImplementedError
     
-    def get_instance(func):
+    def get_class(func):
         """
         Args:
-            func (_type_): 不确定性的计算方式，lambda self, probs: process(probs)
+            func : 不确定性的计算方法
+            func = lambda datasource: Uncertrainty.entropy(ModelMetric(datasource).get_probs(model))
 
         Returns:
             UncertaintyBasedSelector: 基于不确定性的选择器
@@ -56,5 +50,5 @@ class UncertaintyBasedSelector(Selector):
         return type(
             'UnKnown',
             (UncertaintyBasedSelector, ),
-            {"get_uncertainty": func}
+            {"get_uncertainty": lambda self, datasource: func(datasource)}
         )
