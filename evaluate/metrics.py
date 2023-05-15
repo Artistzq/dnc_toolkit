@@ -504,6 +504,19 @@ class ModelMetric:
             total += y.numel()
         return sum(vals) / total
 
+    @limit_decimal_places
+    @check_and_convert
+    def disagree_rate(self, model1, model2):
+        dif = 0
+        total = 0
+        for X, y in self.testloader:
+            X = X.to(self.device)
+            pred_m = torch.argmax(model1(X), dim=-1)
+            pred_t = torch.argmax(model2(X), dim=-1)
+            dif += torch.count_nonzero(pred_m - pred_t)
+            total += pred_m.shape[0]
+        return dif.item() / total
+
     def clever(self, model, num_cases=100):
         
         from art.estimators.classification import PyTorchClassifier
