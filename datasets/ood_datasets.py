@@ -88,7 +88,7 @@ def get_corrupt_dataset(root, dataset_name, serverity,
     elif dataset_name == 'CIFAR10':
         test_sets = get_cifar_c_dataset(root, "CIFAR-10-C", serverity, ood_categories, normalizer, augmented)
     elif dataset_name == "TinyImageNet":
-        test_sets = get_tinyimagenet_c_dataset(root, serverity, ood_categories, normalizer)
+        test_sets = get_tinyimagenet_c_dataset(root, serverity, ood_categories, normalizer, augmented)
     else:
         pass
     
@@ -103,30 +103,44 @@ def get_corrupt_dataset(root, dataset_name, serverity,
         return test_sets
 
 
-def get_tinyimagenet_c_dataset(root, serverity, ood_categories, normalizer):
+def get_tinyimagenet_c_dataset(root, serverity, ood_categories, normalizer, augmented):
     # oodname + serverity作为dir
     test_sets = {}
+    dirs = os.listdir(os.path.join(root, 'Tiny-ImageNet-C'))
+    if augmented:
+        trans = transforms.Compose([
+            transforms.RandomHorizontalFlip(), 
+            transforms.RandomCrop(64, padding=8), 
+            transforms.ColorJitter(0.2, 0.2, 0.2), 
+            transforms.ToTensor(), 
+            normalizer])
+    else:
+        trans = transforms.Compose([
+            transforms.ToTensor(), 
+            normalizer])
+    
     for ood in ood_categories:
-        valid_dir = os.path.join(root, 'Tiny-ImageNet-C/{}/{}'.format(ood, serverity))
-        testset = ImageFolder(valid_dir, transform=normalizer)
-        test_sets[ood] = testset
+        if ood in dirs:
+            valid_dir = os.path.join(root, 'Tiny-ImageNet-C/{}/{}'.format(ood, serverity))
+            testset = ImageFolder(valid_dir, transform=trans)
+            test_sets[ood] = testset
     return test_sets
 
 
 def get_cifar_c_dataset(root, dataset_name, serverity, ood_categories, normalizer, augmented):
-    
     transform_train = transforms.Compose([
         transforms.ToPILImage(),
         transforms.RandomCrop(32, padding=4),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
+        normalizer
     ])
 
     transform_test = transforms.Compose([
         transforms.ToTensor(),
+        normalizer
     ])
 
-    
     test_sets = {}
     dataset_path = os.path.join(root, dataset_name)
     labels = np.load(os.path.join(dataset_path, "labels.npy"))[(serverity-1)*10000: serverity*10000]
@@ -145,14 +159,12 @@ def get_cifar_c_dataset(root, dataset_name, serverity, ood_categories, normalize
         else:
             test_image = [transform_test(image) for image in test_image]
             
-        
         test_image = torch.stack(test_image)
         # test_image = test_image.permute(0,3,1,2)
-        test_image = normalizer(test_image)
+        # test_image = normalizer(test_image)
         test_label = torch.from_numpy(test_label)
         
         test_dataset = TensorDataset(test_image, test_label)
-        
         test_sets[ood] = test_dataset
     
     return test_sets
