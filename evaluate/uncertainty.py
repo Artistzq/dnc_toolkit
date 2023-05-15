@@ -51,3 +51,16 @@ class Uncertainty:
     def confidence(cls, probs):
         return torch.max(probs, axis=1)[0]
     
+    @classmethod
+    def get(cls, probs, method="entropy"):
+        if method == "entropy":
+            return cls.entropy(probs, True)
+        elif method == "gini":
+            return cls.gini(probs)
+        elif method == "margin":
+            return cls.margin(probs)
+        elif method == "confidence":
+            return cls.confidence(probs)
+        else:
+            raise ValueError("method {} has not been implemented.".format(method))
+    
