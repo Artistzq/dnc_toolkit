@@ -5,7 +5,11 @@ import sklearn.metrics as sm
 from thop import profile
 import functools
 from . import reliability_diagrams as rd
+from .uncertainty import Uncertainty
 from ..utils.decorators import deprecated
+
+from ..datasets import wrapper
+from ..datasets.selector import UncertaintyBasedSelector
 
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -43,8 +47,6 @@ def _class_acc(model, data_loader, num_class):
     return class_acc
 
 
-
-
 def _ece(model, data_loader, num_bins=10, gen_fig=False, title=None):
     model.eval()
     model = model.to(device)
@@ -74,7 +76,7 @@ def _ece(model, data_loader, num_bins=10, gen_fig=False, title=None):
     else:
         return bin_data
 
-@deprecated
+
 def __compute_calibration(true_labels, pred_labels, confidences, num_bins=10):
     """无用"""
     assert(len(confidences) == len(pred_labels))
@@ -98,36 +100,6 @@ def __compute_calibration(true_labels, pred_labels, confidences, num_bins=10):
     return ece
 
 
-def _nfr(model1, model2, data_loader):
-    model1.eval()
-    model2.eval()
-    model1 = model1.to(device)
-    model2 = model2.to(device)
-    vals = []
-    total = 0
-    for X, y in data_loader:
-        X = X.to(device)
-        y = y.to(device)
-        with torch.no_grad():
-            pred1 = model1(X)
-            pred2 = model2(X)
-        pred_h1 = torch.argmax(pred1, axis=-1)
-        pred_h2 = torch.argmax(pred2, axis=-1)
-        vals.append(__nfr_compute(pred_h1, pred_h2, y).item())
-        total += y.numel()
-    return 100. * sum(vals) / total
-
-
-def __nfr_compute(pred_h1: torch.Tensor, pred_h2: torch.Tensor, truth: torch.Tensor):
-    correct_h1 = pred_h1.eq(truth)
-    wrong_h2 = ~pred_h2.eq(truth)
-    negative_flip = wrong_h2.masked_select(correct_h1)
-    val = negative_flip.count_nonzero()
-    return val                          
-    # val = negative_flip.count_nonzero() / truth.size(0)
-    # return 100. * val.item()
-
-
 def _robustness(model: torch.nn.Module, dataset: torch.utils.data.Dataset, num_classes):
     model.eval()
     single_sample = dataset[0][0]
@@ -149,46 +121,6 @@ def _robustness(model: torch.nn.Module, dataset: torch.utils.data.Dataset, num_c
         print("Score of Current Image: {}".format(score))
         scores.append(score)
     return sum(scores) / len(scores), scores
-
-
-def _conf_matrix(model, data_loader):
-    mat = None
-    model.eval()
-    model = model.to(device)
-    for X, y in data_loader:
-        with torch.no_grad():
-            X = X.to(device)
-            pred = model(X)
-        y_pred = torch.argmax(pred, axis=-1).cpu().numpy()
-        y_true = y.numpy()
-        if mat is None:
-            mat = sm.confusion_matrix(y_true, y_pred, labels=[i for i in range(100)])
-        else:
-            mat += sm.confusion_matrix(y_true, y_pred, labels=[i for i in range(100)])
-    cmd = sm.ConfusionMatrixDisplay(mat)
-    cmd.plot()
-    print(mat)
-    return mat, cmd
-
-
-def _apfd(model, data_loader):
-    model.eval()
-    model = model.to(device)
-    error_order_sum = 0
-    total = 0
-    error = 0
-    for X, y in data_loader:
-        with torch.no_grad():
-            X = X.to(device)
-            pred = model(X)
-            y = y.to(device)
-        diff = y - torch.argmax(pred, axis=-1)
-        error += diff.count_nonzero().item()
-        diff = diff.cpu().numpy()
-        error_order = np.where(diff != 0)[0] + total + 1
-        error_order_sum += np.sum(error_order)
-        total += y.numel()
-    return 1 - error_order_sum / (total * error) + 1 / (2 * total)
 
 
 class ModelMetric:
@@ -325,10 +257,6 @@ class ModelMetric:
             error += diff.count_nonzero().item()
             total += y.numel()
         return 1 - (error / total)
-    
-    @deprecated(reason="It is not recommended to use this method as the name 'acc' is not standardized.", new="Metric.accuracy")
-    def acc(self, model):
-        return self.accuracy(model)
 
     @check_and_convert
     def class_accuracy(self, model):
@@ -354,10 +282,6 @@ class ModelMetric:
             class_acc[:, 1] += total_class_cnts
         class_acc[:, 2] = class_acc[:, 0] / class_acc[:, 1] * 100
         return class_acc
-    
-    @deprecated(reason="It is not recommended to use this method as the name 'class_acc' is not standardized.", new="Metric.class_accuracy")
-    def class_acc(self, model):
-        return self.class_accuracy(model)
 
     @limit_decimal_places
     @check_and_convert
@@ -453,30 +377,6 @@ class ModelMetric:
         
         return rd.compute_calibration(true_labels, pred_labels, confidences, num_bins)
 
-    @deprecated(reason="It is not recommended to use this method as the name 'ece' is not standardized.", new="Metric.expect_calibration_error")
-    def ece(self, model, num_bins=-1, save_path=None, return_full=False):
-        if num_bins < 0:
-            num_bins = self.num_class
-        if save_path is not None:
-            title = (save_path.split("-")[-1]).split(".")[0]
-            bin_data, fig = _ece(model, self.testloader, num_bins, gen_fig=True, title=title)
-            fig.savefig(save_path)
-        else:
-            bin_data = _ece(model, self.testloader, num_bins)
-        
-        for k, v in bin_data.items():
-            if isinstance(v, np.ndarray):
-                bin_data[k] = v.tolist()
-
-        if return_full:
-            return bin_data
-        else:
-            return bin_data["expected_calibration_error"]
-
-    @deprecated(new="Metric.negative_flip_rate")
-    def nfr(self, model1, model2):
-        return self.negative_flip_rate(model1, model2)
-
     @limit_decimal_places
     @check_and_convert
     def negative_flip_rate(self, model1, model2):
@@ -507,6 +407,15 @@ class ModelMetric:
     @limit_decimal_places
     @check_and_convert
     def disagree_rate(self, model1, model2):
+        """计算两个模型在testloader上的分歧率
+
+        Args:
+            model1 (nn.Module): 模型1
+            model2 (nn.Module): 模型2
+
+        Returns:
+            float: disagree_rate ∈[0, 1]
+        """
         dif = 0
         total = 0
         for X, y in self.testloader:
@@ -527,74 +436,120 @@ class ModelMetric:
         avg_score, scores = _robustness(model, testset, self.num_class)
         return avg_score
     
-    def conf_matrix(self, model, save_path):
-        mat, cmd = _conf_matrix(model, self.testloader)
-        cmd.figure_.savefig(save_path)
+    @check_and_convert
+    def confusion_matrix(self, model) -> np.ndarray:
+        """返回模型testloader上的混淆矩阵
+
+        Args:
+            model (nn.Module): 被测模型
+
+        Returns:
+            np.ndarray: 混淆矩阵
+        """
+        mat = None
+        for X, y in self.testloader:
+            X = X.to(self.device)
+            pred = model(X)
+            y_pred = torch.argmax(pred, axis=-1).cpu().numpy()
+            y_true = y.numpy()
+            if mat is None:
+                mat = sm.confusion_matrix(y_true, y_pred, labels=[i for i in range(100)])
+            else:
+                mat += sm.confusion_matrix(y_true, y_pred, labels=[i for i in range(100)])
         return mat
-    
+
+    @check_and_convert
     def cka_matrix(self, model1, model2) -> np.ndarray:
         from torch_cka import CKA
-        cka = CKA(model1, model2,
-                model1_layers=get_conv_linear_layers(model1),
-                model2_layers=get_conv_linear_layers(model2),
-                device=device)
-
-        cka.compare(self.testloader) # secondary dataloader is optional
-
-        results = cka.export()  # returns a dict that contains model names, layer names
-                                # and the CKA matrix
+        cka = CKA(
+            model1, model2,
+            model1_layers=get_conv_linear_layers(model1),
+            model2_layers=get_conv_linear_layers(model2),
+            device=self.device
+        )
+        cka.compare(self.testloader)
+        results = cka.export()
         results.pop("CKA")
         return cka.hsic_matrix, results
-    
-    def APFD(self, model, k, sort=True):
-        # 从原始loader获取排序
-        model.eval()
-        model = model.to(device)
-        probs = []
-        for X, y in self.testloader:
-            X = X.to(device)
-            y = y.to(device)
-            with torch.no_grad():
-                pred = model(X)
-            probs.append(pred)
-        probs = torch.cat(probs).cpu()
-        probs = torch.nn.functional.softmax(probs, dim=-1).detach().cpu().numpy()
-        # 按照deepgini排序
-        gini = np.sum(probs**2,axis=1)
-        ranks = np.argsort(gini)[: k]
-        if not sort:
-            ranks = list(range(10000))[: k]
-        # 构建新的loader
-        class SortedSampler(torch.utils.data.Sampler):
-            def __init__(self, ranks):
-                self.ranks = ranks
-        
-            def __iter__(self):
-                return iter(self.ranks)
-        
-            def __len__(self):
-                return len(self.ranks)
-        sampler = SortedSampler(ranks)
-        new_loader = torch.utils.data.DataLoader(
-            self.testset, 
-            batch_size=100, 
-            shuffle=False, 
-            sampler=sampler,
-            num_workers=4)
-        if k < 0:
-            new_loader = self.testloader
-        apfd = _apfd(model, new_loader)
-        acc = _acc(model, new_loader)
-        ece = _ece(model, new_loader)["expected_calibration_error"]
-        return round(apfd*100, 2)
-        # return {"apfd": round(apfd*100, 2), "acc": round(100*acc, 2), "ece": round(ece*100, 2)}
-        
-    
+
+    @limit_decimal_places
+    @check_and_convert
+    def apfd(self, model, specified_loader=None):
+        """返回指定loader在模型上的APFD
+        Args:
+            model (nn.Module): 模型
+            specified_loader (Dataloader, optional): 指定计算APFD的loader。
+                如果为None，则使用Metric中的loader. Defaults to None.
+        Returns:
+            float: apfd ∈[0, 1]
+        """
+        if not specified_loader:
+            specified_loader = self.testloader
+        error_order_sum = 0
+        total = 0
+        error = 0
+        for X, y in specified_loader:
+            X = X.to(self.device)
+            pred = model(X)
+            y = y.to(self.device)
+            diff = y - torch.argmax(pred, axis=-1)
+            error += diff.count_nonzero().item()
+            diff = diff.cpu().numpy()
+            error_order = np.where(diff != 0)[0] + total + 1
+            error_order_sum += np.sum(error_order)
+            total += y.numel()
+        return 1 - error_order_sum / (total * error) + 1 / (2 * total)
+
+    @check_and_convert
+    def get_sorted_loader(self, model, strategy="gini"):
+        values = Uncertainty.get(self.get_probs(model, temperature=4), strategy)
+        indices = np.argsort(values)
+        new_loader = wrapper.tensor_to_loader(wrapper.loader_to_tensor(self.testloader)[indices])
+        return new_loader
+
+
 class Metric(ModelMetric):
-    @deprecated(reason=
-                "The design of the constructor for this class is inappropriate. \n Use 'toolkit.evaluate.ModelMetric' instead.",
+    @deprecated(reason="The design of the constructor for this class is inappropriate. \n Use 'toolkit.evaluate.ModelMetric' instead.",
                 new="toolkit.evaluate.ModelMetric")
     def __init__(self, dataset, dataloader, num_class, use_gpu=True, decimal_places=4) -> None:
         self.dataset = dataset
         self.num_class = num_class
         super().__init__(dataloader, use_gpu, decimal_places)
+    
+    @deprecated(new="Metric.confusion_matrix")
+    def conf_matrix(self, model, save_path):
+        mat, cmd = self.confusion_matrix(model)
+        cmd.figure_.savefig(save_path)
+        return mat
+
+    @deprecated(reason="It is not recommended to use this method as the name 'ece' is not standardized.", new="Metric.expect_calibration_error")
+    def ece(self, model, num_bins=-1, save_path=None, return_full=False):
+        if num_bins < 0:
+            num_bins = self.num_class
+        if save_path is not None:
+            title = (save_path.split("-")[-1]).split(".")[0]
+            bin_data, fig = _ece(model, self.testloader, num_bins, gen_fig=True, title=title)
+            fig.savefig(save_path)
+        else:
+            bin_data = _ece(model, self.testloader, num_bins)
+        
+        for k, v in bin_data.items():
+            if isinstance(v, np.ndarray):
+                bin_data[k] = v.tolist()
+
+        if return_full:
+            return bin_data
+        else:
+            return bin_data["expected_calibration_error"]
+
+    @deprecated(new="Metric.negative_flip_rate")
+    def nfr(self, model1, model2):
+        return self.negative_flip_rate(model1, model2)
+    
+    @deprecated(reason="It is not recommended to use this method as the name 'class_acc' is not standardized.", new="Metric.class_accuracy")
+    def class_acc(self, model):
+        return self.class_accuracy(model)
+
+    @deprecated(reason="It is not recommended to use this method as the name 'acc' is not standardized.", new="Metric.accuracy")
+    def acc(self, model):
+        return self.accuracy(model)
