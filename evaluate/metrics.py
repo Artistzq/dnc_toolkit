@@ -208,7 +208,7 @@ class ModelMetric:
                 break
         return self.num_class
     
-    def limit_demical_places(func):
+    def limit_decimal_places(func):
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
             result = func(self, *args, **kwargs)
@@ -297,7 +297,7 @@ class ModelMetric:
         return params
 
     @check_and_convert
-    def get_probs(self, model, temperature=1):
+    def get_probs(self, model, temperature=1) -> torch.tensor:
         probs = []
         for X, y in self.testloader:
             X = X.to(self.device)
@@ -306,7 +306,7 @@ class ModelMetric:
             probs.append(prob)
         return torch.cat(probs)
     
-    @limit_demical_places
+    @limit_decimal_places
     @check_and_convert
     def accuracy(self, model):
         """返回模型在test_loader上的的准确率
@@ -359,8 +359,7 @@ class ModelMetric:
     def class_acc(self, model):
         return self.class_accuracy(model)
 
-    
-    @limit_demical_places
+    @limit_decimal_places
     @check_and_convert
     def expect_calibration_error(self, model, num_bins=-1):
         """计算模型在testloader上的校准率
@@ -474,11 +473,11 @@ class ModelMetric:
         else:
             return bin_data["expected_calibration_error"]
 
-    @deprecated(new="Metric.negatice_flip_rate")
+    @deprecated(new="Metric.negative_flip_rate")
     def nfr(self, model1, model2):
         return self.negative_flip_rate(model1, model2)
 
-    @limit_demical_places
+    @limit_decimal_places
     @check_and_convert
     def negative_flip_rate(self, model1, model2):
         """计算model1和model2之间的负翻转率
