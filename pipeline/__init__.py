@@ -1,1 +1,1 @@
-from .trainer import TinyTrainer
+from .tiny_trainer import TinyTrainer
