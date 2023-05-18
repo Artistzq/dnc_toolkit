@@ -134,7 +134,7 @@ class ModelMetric:
         if (self.num_class is None):
             # print("根据模型计算类")
             for X, y in self.testloader:
-                X = X.to(next(model.parameters()).device)
+                X = X.to(self.device)
                 logits = model(X)
                 self.num_class = logits.shape[1]
                 break
@@ -271,7 +271,7 @@ class ModelMetric:
         class_acc = np.zeros((self.num_class, 3))
         for X, y in self.testloader:
             with torch.no_grad():
-                X = X.to(device)
+                X = X.to(self.device)
                 pred = model(X)
             y_hat = torch.argmax(pred, axis=-1).cpu().detach().numpy()
             y = y.cpu().detach().numpy()
@@ -390,8 +390,8 @@ class ModelMetric:
         vals = []
         total = 0
         for X, y in self.testloader:
-            X = X.to(device)
-            y = y.to(device)
+            X = X.to(self.device)
+            y = y.to(self.device)
             logits1 = model1(X)
             logits2 = model2(X)
             pred1 = torch.argmax(logits1, axis=-1)
