@@ -19,14 +19,6 @@ classes = {
 }
 
 
-def get_conv_linear_layers(net):
-    names = []
-    for name, layer in net.named_modules():
-        if isinstance(layer, torch.nn.modules.conv.Conv2d) or isinstance(layer, torch.nn.modules.Linear):
-            names.append(name)
-    return names
-
-
 def _class_acc(model, data_loader, num_class):
     model.eval()
     model = model.to(device)
@@ -228,6 +220,31 @@ class ModelMetric:
         _, params = cls.computational_workload_of_model(model, input_shape, unit)
         return params
 
+    @classmethod
+    def get_layer_names(cls, model, layer_type=None):
+        """返回由layer_type指定的层的名称
+
+        Args:
+            model (_type_): _description_
+            layer_type (_type_, optional): _description_. Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
+        layers = {
+            "conv2d": torch.nn.modules.conv.Conv2d,
+            "bn": torch.nn.modules.BatchNorm2d,
+            "linear":  torch.nn.modules.Linear, 
+        }
+        if not layer_type:
+            layer_type = layers.keys()
+        names = []
+        for name, layer in model.named_modules():
+            for types in layers.values():
+                if isinstance(layer, types):
+                    names.append(name)
+        return names
+    
     @check_and_convert
     def get_probs(self, model, temperature=1) -> torch.tensor:
         probs = []
@@ -463,8 +480,8 @@ class ModelMetric:
         from torch_cka import CKA
         cka = CKA(
             model1, model2,
-            model1_layers=get_conv_linear_layers(model1),
-            model2_layers=get_conv_linear_layers(model2),
+            model1_layers=self.get_layer_names(model1),
+            model2_layers=self.get_layer_names(model2),
             device=self.device
         )
         cka.compare(self.testloader)
