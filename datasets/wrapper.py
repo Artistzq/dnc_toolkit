@@ -6,6 +6,8 @@ from typing import List
 
 
 def tensor_to_dataset(images, labels):
+    images = images.to("cpu")
+    labels = labels.to("cpu")
     return TensorDataset(images, labels)
 
 
@@ -26,7 +28,7 @@ def loader_to_tensor(data_loader):
     samples = []
     labels = []
     for X, y in data_loader:
-        samples.append(samples)
+        samples.append(X)
         labels.append(y)
     return torch.cat(samples), torch.cat(labels)
 
@@ -46,4 +48,8 @@ def merge_dataloader(data_loaders: List[DataLoader]):
     tensors = [loader_to_tensor(data_loader) for data_loader in data_loaders]
     X = [tensor[0] for tensor in tensors]
     y = [tensor[1] for tensor in tensors]
+    # X = torch.tensor( [item.cpu().detach().numpy() for item in X] )
+    # y = torch.tensor( [item.cpu().detach().numpy() for item in y] )
+    X = torch.vstack(X)
+    y = torch.vstack(y)
     return tensor_to_loader(X, y, batch_size, False, num_works)
