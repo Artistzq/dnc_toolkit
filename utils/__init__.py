@@ -1,3 +1,4 @@
 from . import disagreements
-from . import context_manager
+
 from .logger import Logger
+from .context_manager import Timer
