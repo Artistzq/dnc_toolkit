@@ -14,7 +14,7 @@ class KnowledgeDistillationLoss(nn.Module):
             criterion (_type_): nn.CrossEntropyCriterion
             teacher (nn.Module, optional): 教师模型. Defaults to None.
             alpha (float, optional): KL散度项的权重. Defaults to 0.8.
-            T (int, optional): 交叉熵项的权重. Defaults to 4.
+            T (int, optional): 温度. Defaults to 4.
         """
         
         super(KnowledgeDistillationLoss, self).__init__()
