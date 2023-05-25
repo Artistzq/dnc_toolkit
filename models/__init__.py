@@ -49,8 +49,9 @@ from .stochasticdepth import stochastic_depth_resnet34
 from .stochasticdepth import stochastic_depth_resnet50
 from .stochasticdepth import stochastic_depth_resnet101
 
-
 from . import models_with_adapter as ada
+
+import torch
 
 def get_ada_network(net, num_class, adapter=None, gpu=True):
     if net == "resnet20":
@@ -64,13 +65,14 @@ def get_ada_network(net, num_class, adapter=None, gpu=True):
         net = ada.wideresnet(num_class, depth, widen_factor)
     elif net == "resnet18":
         net = ada.resnet18(num_class)
-    
+    elif net == "resnet50":
+        net = ada.resnet50(num_class)
     if gpu == True:
         net = net.to("cuda")
     return net
 
 
-def get_network(net, num_class, gpu=None):
+def get_network(net, num_class, gpu=None, weight=None) -> torch.nn.Module:
     """ return given network
     """
     class Args:
@@ -186,5 +188,8 @@ def get_network(net, num_class, gpu=None):
     
     if args.gpu:
         net = net.cuda()
+        
+    if weight:
+        net.load_state_dict(torch.load(weight))
         
     return net
