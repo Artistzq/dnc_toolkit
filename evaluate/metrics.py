@@ -12,6 +12,8 @@ from ..datasets import wrapper
 from ..datasets.selector import UncertaintyBasedSelector
 
 
+# TODO: Disrate Limit Decimal没用;convert之后没把device它变回去，也可能是我弄一半就暂停，导致没变回去
+
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 classes = {
@@ -116,11 +118,12 @@ def _robustness(model: torch.nn.Module, dataset: torch.utils.data.Dataset, num_c
 
 
 class ModelMetric:
-    def __init__(self, dataloader, use_gpu=True, decimal_places=4) -> None:
+    def __init__(self, dataloader, use_gpu=True, decimal_places=4, verbose=False) -> None:
         self.testloader = dataloader
         self.device = "cuda" if use_gpu else "cpu"
         self.decimal_places = decimal_places
         self.num_class = None
+        self.verbose = verbose
     
     def get_num_class(self, model):
         if (self.num_class is None):
@@ -131,6 +134,15 @@ class ModelMetric:
                 self.num_class = logits.shape[1]
                 break
         return self.num_class
+    
+    def print_result_if_define(func):
+        @functools.wraps(func)
+        def wrapper(self, *args, **kwargs):
+            result = func(self, *args, **kwargs)
+            if self.verbose:
+                print("[{}]: {}".format(func.__name__(), result))
+            return result
+        return wrapper
     
     def limit_decimal_places(func):
         @functools.wraps(func)
@@ -203,6 +215,12 @@ class ModelMetric:
             macs /= 1048576 * 1024
             params /= 1048576 * 1024
         return round(macs*2, 3), round(params, 3)
+    
+    @classmethod
+    def flops_and_params(cls, model, input_shape, flops_unit="GB", params_unit="MB"):
+        flops = cls.flops(model, input_shape, flops_unit)
+        params = cls.params(model, input_shape, params_unit)
+        return flops, params
 
     @classmethod
     def macs(cls, model, input_shape, unit="MB"):
