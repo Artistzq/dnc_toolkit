@@ -82,6 +82,7 @@ def generate_disagreements(image_loader, attack):
     adv_images = []
     raw_labels = []
     for images, labels in image_loader:
+        images = images.to("cuda")
         adv_images.append(attack(images, labels))
         raw_labels.append(labels)
     adv_images = torch.cat(adv_images)
