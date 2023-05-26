@@ -2,8 +2,10 @@ import torch
 import torch.nn as nn
 from torchattacks.attack import Attack
 
+from ...datasets import wrapper
+from .finder import Finder
 
-class Diffinder(Attack):
+class Diffinder(Attack, Finder):
     r"""
     Distance Measure : Linf
 
@@ -87,3 +89,9 @@ class Diffinder(Attack):
                 inputs = self.normalize(inputs)
             logits = model(inputs)
             return logits
+        
+    def find(self, datasource, save_path=None):
+        images, labels = wrapper.to_tensor(datasource)
+        if save_path:
+            torch.save(images, save_path)
+        return self.forward(images, labels)

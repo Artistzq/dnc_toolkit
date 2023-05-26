@@ -3,9 +3,13 @@ import time
 import random
 import numpy as np
 from torchvision.transforms import transforms
-from .show import Denormalize
+import torch.nn.functional as F
 
-class DiffChaser:
+from .finder import Finder
+from .utils import wrapper, deprecated, Denormalize, Timer
+
+
+class DiffChaser(Finder):
     def __init__(self, 
                  model1, 
                  model2, 
@@ -17,7 +21,7 @@ class DiffChaser:
                  mutate_rate=0.01,
                  distance_restrict=8/255,
                  verbose=False) -> None:
-        super().__init__()
+        # super().__init__()
         self.model1 = model1
         self.model2 = model2
         self.iteration = iteration
@@ -47,18 +51,18 @@ class DiffChaser:
         else:
             return -1
 
-    @DeprecationWarning
+    @deprecated
     def basic_fitness(self, x):
         return self.k_uncertainty_fitness(x, 1)
     
-    @DeprecationWarning
+    @deprecated
     def k_uncertainty_fitness(self, x, k):
         assert k > 0, "k start from 1."
         logits = self.model1(x)
         indicies = torch.argsort(logits, dim=-1)
         return logits[indicies[0]] - logits[indicies[k]]
     
-    @DeprecationWarning
+    @deprecated
     def t_target_fitness(self, x, t):
         logits = self.model1(x)
         indicies = torch.argsort(logits, dim=-1)
@@ -180,6 +184,25 @@ class DiffChaser:
             print("Failed. Can not find any disagreements in limit {} iterations. Return mutated.".format(iteration))
         return population[0]
     
+    def find(self, datasource, save_path=None):
+        if not isinstance(datasource, torch.Tensor):
+            images, labels = wrapper.to_tensor(datasource)
+        else:
+            datasource = images
+            
+        result = []
+        with Timer("Diff Chaser") as timer:
+            for single_x in images:
+                result.append(self.genetic_algorithm(single_x))
+            result = torch.stack(result)
+        if self.verbose:
+            print("Time cosumption: {:.3f} s".format(timer.get_elapsed_time()))
+        
+        if save_path:
+            torch.save(result, save_path)
+        return result
+    
+    @deprecated(new="Diffchaser.find")
     def __call__(self, x, *args, **kwargs):
         """
         Args:
@@ -197,7 +220,7 @@ class DiffChaser:
             result = []
             for single_x in x:
                 result.append(self.genetic_algorithm(single_x))
-            result = torch.cat(result)
+            result = torch.stack(result)
         elif x.ndim == 3:
             result = self.genetic_algorithm(x)
         else:
@@ -205,3 +228,24 @@ class DiffChaser:
         if self.verbose:
             print("Time cosumption: {:.3f} s".format(time.perf_counter() - start))
         return result
+
+
+
+class SameChaser(DiffChaser):
+    
+    def agree(self, x) -> bool:
+        return not super().agree(x)
+    
+    def fitness_function(self, x, model, ref, option="index"):
+        image = torch.unsqueeze(x, 0).detach()
+        T = 4
+        with torch.no_grad():
+            tiny_logits = self.model2(image)
+            large_logits = self.model1(image)
+            # 两者概率分布尽可能相似
+            loss = torch.nn.KLDivLoss(reduction = "batchmean")(
+                F.log_softmax(tiny_logits/T + 1e-8, dim=1), 
+                F.softmax(large_logits/T, dim=1)
+            )  * T * T
+        # loss越小越好
+        return loss.item()
