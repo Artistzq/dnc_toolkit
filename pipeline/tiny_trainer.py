@@ -24,7 +24,7 @@ class TinyTrainer():
     def after_inference(self):
         pass
 
-    def train(self, train_loader, val_loader, num_epochs, lr, lr_scheduler=None, weight_decay=5e-4, criterion=None):
+    def train(self, train_loader, val_loader, num_epochs, lr, lr_scheduler=False, weight_decay=5e-4, criterion=None):
         device = self.device
         self.model = self.model.to(device)
 
@@ -34,7 +34,7 @@ class TinyTrainer():
         optimizer = optim.Adam(self.model.parameters(), lr=lr, weight_decay=weight_decay)
 
         # milestones: [20%, 40%, 40%] [60, 120, 160]
-        milestones = [int(num_epochs * 0.3), int(num_epochs * 0.6)]
+        milestones = [int(num_epochs * 0.2), int(num_epochs * 0.5), int(num_epochs * 0.8)]
         train_scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma=0.5) #learning rate decay
         
         for epoch in range(num_epochs):
@@ -109,7 +109,8 @@ class TinyTrainer():
             # val_accuracy = val_correct / val_total
             # print("Epoch {:>2} - Train Loss: {:.4f} - Val Loss: {:.4f} - Train Accuracy: {:.2f}% - Val Accuracy: {:.2f}%".format(
             #     epoch+1, train_loss, val_loss, train_accuracy*100, val_accuracy*100))
-            train_scheduler.step()
+            if lr_scheduler:
+                train_scheduler.step()
             print()
 
     def eval(self, test_loader):
