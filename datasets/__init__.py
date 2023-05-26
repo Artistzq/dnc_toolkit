@@ -18,7 +18,8 @@ def get_dataset(dataset_name, batch_size=128, augmented=True, num_workers=4, roo
     return dataset
 
 
-def get_poisoned_dataset(dataset_name, batch_size=128, poisoning_rate=0.0, trigger_label=1, trigger_size=5, trigger_path="./triggers/trigger_white.png",
+def get_poisoned_dataset(dataset_name, batch_size=128, poisoning_rate=0.0, trigger_label=1, trigger_size=5, 
+                         trigger_path="./triggers/trigger_white.png",
                          augmented=True, num_workers=4, root="./data", normalization=None):
     print("===========> Get Poisoned Data with rate {:.2f}: {}".format(poisoning_rate, dataset_name))
     args = PoisonArgs(trigger_path, trigger_size, trigger_label, poisoning_rate)
