@@ -141,6 +141,12 @@ class CKA:
                 self.model2_info['Layers'] += [name]
                 layer.register_forward_hook(partial(self._log_layer, "model2", name))
 
+    def _line_mat(self, mats):
+        result = mats[0]
+        for i in range(1, len(mats)):
+            result = torch.matmul(result, mats[i])
+        return result
+    
     def _HSIC(self, K, L):
         """
         Computes the unbiased estimate of HSIC metric.
@@ -152,9 +158,9 @@ class CKA:
         
         N = K.shape[0]
         ones = torch.ones(N, 1).to(self.device)
-        result = torch.trace(K @ L)
-        result += ((ones.t() @ K @ ones @ ones.t() @ L @ ones) / ((N - 1) * (N - 2))).item()
-        result -= ((ones.t() @ K @ L @ ones) * 2 / (N - 2)).item()
+        result = torch.trace(torch.matmul(K, L))
+        result += (self._line_mat([ones.transpose(0, 1), K, ones, ones.transpose(0, 1), L, ones]) / ((N - 1) * (N - 2))).item()
+        result -= (self._line_mat([ones.transpose(0, 1), K, L, ones]) * 2 / (N - 2)).item()
         return (1 / (N * (N - 3)) * result).item()
 
     def compare(self,
@@ -192,13 +198,15 @@ class CKA:
             
             for i, (name1, feat1) in enumerate(self.model1_features.items()):
                 X = feat1.flatten(1)
-                K = X @ X.t()
+                K = self._line_mat([X, X.transpose(0, 1)])
+                # K = X @ X.t()
                 K.fill_diagonal_(0.0)
                 self.hsic_matrix[i, :, 0] += self._HSIC(K, K) / num_batches
 
                 for j, (name2, feat2) in enumerate(self.model2_features.items()):
                     Y = feat2.flatten(1)
-                    L = Y @ Y.t()
+                    L = self._line_mat([Y, Y.transpose(0, 1)])
+                    # L = Y @ Y.t()
                     L.fill_diagonal_(0)
                     assert K.shape == L.shape, f"Feature shape mistach! {K.shape}, {L.shape}"
 
