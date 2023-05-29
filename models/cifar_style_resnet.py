@@ -84,6 +84,8 @@ class BasicBlock(nn.Module):
                     nn.Conv2d(in_planes, self.expansion * planes, kernel_size=1, stride=stride, bias=False),
                     nn.BatchNorm2d(self.expansion * planes)
                 )
+        
+        self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
         out = self.residual_function(x)
@@ -91,7 +93,7 @@ class BasicBlock(nn.Module):
             out += self.shortcut(x)
         else:
             out += x
-        out = nn.ReLU(inplace=True)(out)
+        out = self.relu(out)
         return out
 
 
