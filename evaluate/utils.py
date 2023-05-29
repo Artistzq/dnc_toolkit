@@ -3,8 +3,8 @@ from ..utils import Timer
 
 formatter = "[{}]: {:.4f}"
 
-def evaluate_kit(model, dataset, ref_model=None):
-    metric = ModelMetric(dataset.test_loader, verbose=True)
+def evaluate_kit(model, dataloader, ref_model=None):
+    metric = ModelMetric(dataloader, verbose=True)
     
     print(formatter.format("FLOPs", metric.flops(model, (3, 32, 32))))
     print(formatter.format("Params", metric.params(model, (3, 32, 32))))
