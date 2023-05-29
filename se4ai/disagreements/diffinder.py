@@ -95,3 +95,18 @@ class Diffinder(Attack, Finder):
         if save_path:
             torch.save(images, save_path)
         return self.forward(images, labels)
+
+
+class RevLoss(nn.Module):
+    def __init__(self, loss) -> None:
+        super().__init__()
+        self.loss = loss
+    
+    def forward(self, output, target):
+        return - self.loss(output, target)
+
+
+class SameFinder(Diffinder):
+    def __init__(self, model, ref_model, eps=8 / 255, alpha=2 / 255, steps=10, distance_restrict=8 / 255, random_start=True, normalization=None):
+        super().__init__(model, ref_model, eps, alpha, steps, distance_restrict, random_start, normalization)
+        self.loss = RevLoss(nn.CrossEntropyLoss())
