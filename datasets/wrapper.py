@@ -68,7 +68,7 @@ def tensor_to_dataset(images, labels):
     return TensorDataset(images, labels)
 
 
-def tensor_to_loader(images, labels, batch_size=128, shuffle=True, num_works=4):
+def tensor_to_loader(images, labels, batch_size=128, shuffle=False, num_works=4):
     dataset = tensor_to_dataset(images, labels)
     return DataLoader(dataset, batch_size, shuffle=shuffle, num_workers=num_works)
 
@@ -77,7 +77,7 @@ def dataset_to_tensor(dataset):
     return torch.tensor(dataset.data), torch.tensor(dataset.targets)
 
 
-def dataset_to_loader(dataset, batch_size=128, shuffle=True, num_works=4) -> DataLoader:
+def dataset_to_loader(dataset, batch_size=128, shuffle=False, num_works=4) -> DataLoader:
     return DataLoader(dataset, batch_size, shuffle=shuffle, num_workers=num_works)
 
 
@@ -107,8 +107,8 @@ def merge_dataloader(data_loaders: List[DataLoader]):
     y = [tensor[1] for tensor in tensors]
     # X = torch.tensor( [item.cpu().detach().numpy() for item in X] )
     # y = torch.tensor( [item.cpu().detach().numpy() for item in y] )
-    X = torch.stack(X)
-    y = torch.stack(y)
+    X = torch.vstack(X)
+    y = torch.cat(y)
     return tensor_to_loader(X, y, batch_size, False, num_works)
 
 
