@@ -1,44 +1,76 @@
+import json
 import torch
 import torch.nn as nn
 import torch.optim as optim
-
-
-# from ..utils.progress_bar import progress_bar
 from tqdm.auto import tqdm
-# from tqdm import tqdm_notebook as tqdm
+import os
 
+from .archive import Archive
 
-class TinyTrainer():
-    def __init__(self, model, device=None):
-        self.model = model
-        
+class TinyTrainer:
+    def __init__(self, 
+                 lr, 
+                 num_epochs, 
+                 weight_decay=5e-4, 
+                 criterion=None, 
+                 lr_milestone=None,
+                 device="cuda",
+                 archive: Archive=None,
+                 save_best=True) -> None:
+        self.lr = lr
+        self.num_epochs = num_epochs 
+        self.weight_decay = weight_decay
+        self.criterion = criterion
+        self.lr_milestone = lr_milestone
         self.device = device
-        if not device:
-            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.archive = archive
+        self.save_best = save_best
         
+        if not criterion:
+            self.criterion = nn.CrossEntropyLoss()
         
+        if not lr_milestone:
+            # milestones: [20, 50, 80, 100] 四个挡
+            self.lr_milestone = [int(num_epochs * 0.2), int(num_epochs * 0.5), int(num_epochs * 0.8)]
 
+        # 解析保存
+        if archive:
+            if not isinstance(archive, Archive):
+                raise TypeError("archive should be instance of Archive")
+        
     def before_loss(self, loss, inputs, labels):
         pass
 
     def after_inference(self):
         pass
 
-    def train(self, train_loader, val_loader, num_epochs, lr, lr_scheduler=False, weight_decay=5e-4, criterion=None):
-        device = self.device
-        self.model = self.model.to(device)
-
-        if not criterion:
-            criterion = nn.CrossEntropyLoss()
-            
-        optimizer = optim.Adam(self.model.parameters(), lr=lr, weight_decay=weight_decay)
-
-        # milestones: [20%, 40%, 40%] [60, 120, 160]
-        milestones = [int(num_epochs * 0.2), int(num_epochs * 0.5), int(num_epochs * 0.8)]
-        train_scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma=0.5) #learning rate decay
+    def train(self, 
+              model: nn.Module,
+              train_loader, 
+              val_loader, 
+              optimizer="Adam"):
         
-        for epoch in range(num_epochs):
-            
+        device = self.device
+        criterion = self.criterion
+        model = model.to(device)
+        
+        # 定义优化器
+        if optimizer == "Adam":
+            optimizer = optim.Adam(model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+        elif optimizer == "SGD":
+            optimizer = optim.SGD(model.parameters(), lr=self.lr, weight_decay=self.weight_decay, momentum=0.9)
+
+        # 定义学习率衰减器
+        train_scheduler = optim.lr_scheduler.MultiStepLR(
+            optimizer, milestones=self.lr_milestone, gamma=0.2)
+
+        # 日志
+        logs = []
+        
+        best_acc = 0
+        best_epoch = 0
+        # 开始学习
+        for epoch in range(self.num_epochs):
             train_loss = 0.0
             val_loss = 0.0
             train_correct = 0
@@ -46,16 +78,18 @@ class TinyTrainer():
             
             with tqdm(total=(len(train_loader))) as _tqdm:#总长度是data的长度
                 _tqdm.set_description(
-                    '[Training] Epoch [{:03}/{:03}] Lr [{:.1e}]'.format(epoch + 1, num_epochs, optimizer.param_groups[0]['lr'],)
+                    '[Training] Epoch [{:03}/{:03}] Lr [{:.1e}]'.format(
+                        epoch + 1, self.num_epochs, optimizer.param_groups[0]['lr'],
+                    )
                 )#前缀设置一些想要的更新信息
-                self.model.train()
+                model.train()
                 for i, (inputs, labels) in enumerate(train_loader):
                     inputs = inputs.to(device)
                     labels = labels.to(device)
 
                     optimizer.zero_grad()
 
-                    outputs = self.model(inputs)
+                    outputs = model(inputs)
                     self.before_loss(criterion, inputs, labels)
 
                     loss = criterion(outputs, labels)
@@ -75,19 +109,19 @@ class TinyTrainer():
                     
                 self.after_inference()
 
-            self.model.eval()
+            model.eval()
             val_correct = 0
             val_total = 0
             with torch.no_grad():
                 with tqdm(total=(len(val_loader))) as _tqdm:#总长度是data的长度
                     _tqdm.set_description(
-                        '[Testing ] Epoch [{:03}/{:03}] Lr [{:.1e}]'.format(epoch + 1, num_epochs, optimizer.param_groups[0]['lr'],)
+                        '[Testing ] Epoch [{:03}/{:03}] Lr [{:.1e}]'.format(epoch + 1, self.num_epochs, optimizer.param_groups[0]['lr'],)
                     )#前缀设置一些想要的更新信息
                     for i, (inputs, labels) in enumerate(val_loader):
                         inputs = inputs.to(device)
                         labels = labels.to(device)
 
-                        outputs = self.model(inputs)
+                        outputs = model(inputs)
 
                         self.before_loss(criterion, inputs, labels)
                         loss = criterion(outputs, labels)
@@ -103,15 +137,51 @@ class TinyTrainer():
                         )
                         _tqdm.update(1)
 
-            # train_loss /= len(train_loader.dataset)
-            # train_accuracy = train_correct / train_total
-            # val_loss /= len(val_loader.dataset)
-            # val_accuracy = val_correct / val_total
-            # print("Epoch {:>2} - Train Loss: {:.4f} - Val Loss: {:.4f} - Train Accuracy: {:.2f}% - Val Accuracy: {:.2f}%".format(
-            #     epoch+1, train_loss, val_loss, train_accuracy*100, val_accuracy*100))
-            if lr_scheduler:
+            if self.lr_milestone:
                 train_scheduler.step()
+                
+            # 保存，每次都打开文件，重新写入，确保不丢失
+            if self.archive:
+                if self.archive.save_interval == -1:
+                    save_interval = self.num_epochs
+                else:
+                    save_interval = self.archive.save_interval
+                
+                if best_acc < train_correct / train_total:
+                    # 保存并更新最新的best，保存的时候标注是最好模型，并标注当前的Epoch
+                    # 删除上一个最好的
+                    if best_epoch > 0:
+                        pre_best_path = self.archive.get_weight_path(Type="BEST", E=best_epoch)
+                        os.remove(pre_best_path)
+                    
+                    best_epoch = epoch + 1
+                    best_acc = train_correct / train_total
+                    best_path = self.archive.get_weight_path(Type="BEST", E=best_epoch)
+                    torch.save(model, best_path)
+
+                if (epoch + 1) % save_interval == 0 and epoch + 1 != self.num_epochs:
+                    weight_path = self.archive.get_weight_path(Type="MID", E=epoch+1)
+                    torch.save(model, weight_path)
+                
+                if epoch + 1 == self.num_epochs:
+                    weight_path = self.archive.get_weight_path(Type="FIN", E=epoch+1)
+                    torch.save(model, weight_path)
+                
+                # 保存日志
+                log = {
+                    "Epoch": epoch + 1,
+                    "lr": optimizer.param_groups[0]['lr'],
+                    "train_loss": "{:.6f}".format(train_loss / train_total),
+                    "test_loss": "{:.6f}".format(val_loss / val_total),
+                    "train_acc": "{:.2f}%".format(100 * train_correct / train_total),
+                    "test_acc": "{:.2f}%".format(100 * val_correct / val_total)
+                }
+                logs.append(log)
+                with open(self.archive.get_log_path(), "w") as f:
+                    json.dump(logs, f, indent=4)
+            
             print()
+        return model
 
     def eval(self, test_loader):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
