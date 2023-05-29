@@ -4,21 +4,17 @@ from matplotlib import pyplot as plt
 import sklearn.metrics as sm
 from thop import profile
 import functools
+
 from . import reliability_diagrams as rd
+from .cka import CKA
 from .uncertainty import Uncertainty
-from ..utils.decorators import deprecated
-
-from ..datasets import wrapper
-from ..datasets.selector import UncertaintyBasedSelector
-
+from .utils import deprecated
+from .utils import data_wrapper
 
 # TODO: Disrate Limit Decimal没用;convert之后没把device它变回去，也可能是我弄一半就暂停，导致没变回去
+# TODO: 直接打印结果，verbose选项
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-
-classes = {
-    "CIFAR10":('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
-}
 
 
 def _class_acc(model, data_loader, num_class):
@@ -118,6 +114,9 @@ def _robustness(model: torch.nn.Module, dataset: torch.utils.data.Dataset, num_c
 
 
 class ModelMetric:
+    
+    verbose = False
+    
     def __init__(self, dataloader, use_gpu=True, decimal_places=4, verbose=False) -> None:
         self.testloader = dataloader
         self.device = "cuda" if use_gpu else "cpu"
@@ -134,15 +133,6 @@ class ModelMetric:
                 self.num_class = logits.shape[1]
                 break
         return self.num_class
-    
-    def print_result_if_define(func):
-        @functools.wraps(func)
-        def wrapper(self, *args, **kwargs):
-            result = func(self, *args, **kwargs)
-            if self.verbose:
-                print("[{}]: {}".format(func.__name__(), result))
-            return result
-        return wrapper
     
     def limit_decimal_places(func):
         @functools.wraps(func)
@@ -205,7 +195,9 @@ class ModelMetric:
         input.to("cpu")
         macs, params = profile(model, inputs=(input, ), verbose=False)
 
-        if unit == "KB":
+        if unit == "B":
+            pass
+        elif unit == "KB":
             macs /= 1024
             params /= 1024
         elif unit == "MB":
@@ -224,7 +216,6 @@ class ModelMetric:
 
     @classmethod
     def macs(cls, model, input_shape, unit="MB"):
-        
         double_macs, _ = cls.computational_workload_of_model(model, input_shape, unit)
         return round(double_macs / 2, 2)
 
@@ -239,32 +230,41 @@ class ModelMetric:
         return params
 
     @classmethod
-    def get_layer_names(cls, model, layer_type=None):
-        """返回由layer_type指定的层的名称
+    def get_layer_names(cls, model, layer_types=None):
+        """从model中选取layer_types中指定的层的名称，作为列表返回
 
         Args:
-            model (_type_): _description_
-            layer_type (_type_, optional): _description_. Defaults to None.
+            model (torch.nn.Module): 模型
+            layer_types (List[nn.Module], optional): 指定的模块类型. Defaults to None.
 
         Returns:
-            _type_: _description_
+            List[str]: 指定类型的层的名称列表
         """
-        layers = {
-            "conv2d": torch.nn.modules.conv.Conv2d,
-            "bn": torch.nn.modules.BatchNorm2d,
-            "linear":  torch.nn.modules.Linear, 
-        }
-        if not layer_type:
-            layer_type = layers.keys()
+        if layer_types is None:
+            layer_types = [
+                # torch.nn.modules.conv.Conv2d,
+                torch.nn.modules.BatchNorm2d,
+                torch.nn.modules.Linear 
+            ]
         names = []
         for name, layer in model.named_modules():
-            for types in layers.values():
-                if isinstance(layer, types):
+            for layer_type in layer_types:
+                if isinstance(layer, layer_type):
                     names.append(name)
+                    break
         return names
     
     @check_and_convert
     def get_probs(self, model, temperature=1) -> torch.tensor:
+        """返回模型model在温度为temperature下时对testloader输出的概率分布
+
+        Args:
+            model (torch.nn.Module): 模型
+            temperature (int, optional): 温度. Defaults to 1.
+
+        Returns:
+            torch.tensor: 概率分布, shape=(N, C)
+        """
         probs = []
         for X, y in self.testloader:
             X = X.to(self.device)
@@ -272,6 +272,14 @@ class ModelMetric:
             prob = torch.softmax(logits / temperature, dim=-1)
             probs.append(prob)
         return torch.cat(probs)
+    
+    def get_shape(self):
+        """返回当前ModelMetric的数据集的种类数
+        Returns:
+            int: num_classes
+        """
+        for X, y in self.testloader:
+            return X.shape[1: ]
     
     @limit_decimal_places
     @check_and_convert
@@ -494,18 +502,37 @@ class ModelMetric:
         return mat
 
     @check_and_convert
-    def cka_matrix(self, model1, model2) -> np.ndarray:
-        from torch_cka import CKA
-        cka = CKA(
-            model1, model2,
-            model1_layers=self.get_layer_names(model1),
-            model2_layers=self.get_layer_names(model2),
-            device=self.device
-        )
+    def cka(self, model1, model2=None, model1_types=None, model2_types=None, full_info=False):
+        """返回model1和model2在testloader上的CKA信息或单个CKA矩阵
+
+        Args:
+            model1 (torch.nn.Module): 
+            model2 (torch.nn.Module): 是否和第二个模型比较，为None则用第一个模型和自身比较. Defaults to None.
+            model1_types (List[torch.nn.Module], optional): 指定的model1层的类型. Defaults to 卷积层和线性层.
+            model2_types (List[torch.nn.Module], optional): 指定的model2层的类型. Defaults to 卷积层和线性层.
+            full_info (bool, optional): 是否返回全部信息（还是只返回CKA矩阵）. Defaults to False.
+
+        Returns:
+            Dict or np.ndarray: CKA完整信息或CKA矩阵
+        """
+        if model2 is None:
+            assert model2_types is None, "Do not define model2_types when ignoring model2"
+            layers1 = self.get_layer_names(model1, model1_types)
+            cka = CKA(model1, model1, None, None, layers1, layers1, self.device)
+        else:
+            cka = CKA(
+                model1, 
+                model2,
+                model1_layers=self.get_layer_names(model1, model1_types),
+                model2_layers=self.get_layer_names(model2, model2_types),
+                device=self.device
+            )
         cka.compare(self.testloader)
-        results = cka.export()
-        results.pop("CKA")
-        return cka.hsic_matrix, results
+        
+        if full_info:
+            return cka.export()
+        
+        return cka.hsic_matrix
 
     @limit_decimal_places
     @check_and_convert
@@ -539,7 +566,7 @@ class ModelMetric:
     def get_sorted_loader(self, model, strategy="gini"):
         values = Uncertainty.get(self.get_probs(model, temperature=4), strategy)
         indices = np.argsort(values)
-        new_loader = wrapper.tensor_to_loader(wrapper.loader_to_tensor(self.testloader)[indices])
+        new_loader = data_wrapper.tensor_to_loader(data_wrapper.loader_to_tensor(self.testloader)[indices])
         return new_loader
 
 
