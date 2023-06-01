@@ -13,6 +13,8 @@ from .utils import data_wrapper
 
 # TODO: Disrate Limit Decimal没用;convert之后没把device它变回去，也可能是我弄一半就暂停，导致没变回去
 # TODO: 直接打印结果，verbose选项
+# TODO: 修复计算ECE时，numpy 类型错误
+# TODO: 把所有的关于计算概率的部分抽象出来作为函数
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -147,6 +149,8 @@ class ModelMetric:
         1. 模型转化为eval模式
         2. 模型转到指定device
         func执行结束后再转换回原来的状态
+        
+        但是这里注意，如果model.parameters获取不到参数，则无法获取原来的device，则默认转换到self.device然后转回到cpu
 
         Args:
             func (函数): Metric类下的函数
@@ -156,7 +160,13 @@ class ModelMetric:
             models = [arg for arg in args if isinstance(arg, torch.nn.Module)]
             models.extend([arg for arg in kwargs.values() if isinstance(arg, torch.nn.Module)])
             is_training = [model.training for model in models]
-            devices = [next(model.parameters()).device for model in models]
+            
+            devices = []
+            for model in models:
+                if list(model.parameters()) == []:
+                    devices.append("cpu")
+                else:
+                    devices.append(next(model.parameters()).device)
             
             for i, model in enumerate(models):
                 model = model.to(self.device)
@@ -274,7 +284,7 @@ class ModelMetric:
         return torch.cat(probs)
     
     def get_shape(self):
-        """返回当前ModelMetric的数据集的种类数
+        """返回当前ModelMetric的数据集的图片的shape
         Returns:
             int: num_classes
         """
