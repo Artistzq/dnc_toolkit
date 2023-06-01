@@ -72,7 +72,7 @@ class BasicBlock(nn.Module):
             nn.BatchNorm2d(planes)
         )
         
-        self.shortcut = None
+        self.shortcut = nn.Identity()
         if stride != 1 or in_planes != planes:
             if option == 'A':
                 """
@@ -89,10 +89,7 @@ class BasicBlock(nn.Module):
 
     def forward(self, x):
         out = self.residual_function(x)
-        if self.shortcut is not None:
-            out += self.shortcut(x)
-        else:
-            out += x
+        out += self.shortcut(x)
         out = self.relu(out)
         return out
 
