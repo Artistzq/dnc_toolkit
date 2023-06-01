@@ -17,6 +17,22 @@ def return_string(keys):
     return decorator
 
 
+def printable(key=None, confirm=True):
+    def decorator(func):
+        @wraps(func)
+        def wrapped_function(*args, **kwargs):
+            result = func(*args, **kwargs)
+            if confirm:
+                if key:
+                    msg = "[{}]: [{}]".format(key, result)
+                else:
+                    msg = "[{}]".format(result)
+                print(msg)
+            return result
+        return wrapped_function
+    return decorator
+
+
 def deprecated(reason=None, new=None):
     def decorator(func):
         @wraps(func)

@@ -3,7 +3,7 @@ import os
 
 class Archive:
     
-    def __init__(self, root, data_name, model_name, save_interval, **kwargs) -> None:
+    def __init__(self, root, data_name, model_name, save_interval=-1, **kwargs) -> None:
         self.save_interval = save_interval
         self.base_dir = os.path.join(root, data_name, model_name)
         if not os.path.exists(self.base_dir):
@@ -19,6 +19,7 @@ class Archive:
     
     def add_information(self, info):
         self.base_dir += "-[Info={}]".format(info)
+        return self
     
     def get_weight_path(self, **kwargs):
         return self.base_dir + self.__combine(**kwargs) + ".pth"

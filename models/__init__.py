@@ -72,7 +72,7 @@ def get_ada_network(net, num_class, adapter=None, gpu=True):
     return net
 
 
-def get_network(net, num_class, gpu=None, weight=None) -> torch.nn.Module:
+def get_network(net, num_class, gpu=True, weight=None) -> torch.nn.Module:
     """ return given network
     """
     class Args:
@@ -185,7 +185,6 @@ def get_network(net, num_class, gpu=None, weight=None) -> torch.nn.Module:
     elif args.net == 'stochasticdepth101':
         net = stochastic_depth_resnet101()
 
-    
     if args.gpu:
         net = net.cuda()
         
