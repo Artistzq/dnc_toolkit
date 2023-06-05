@@ -9,6 +9,7 @@ from ...evaluate import ModelMetric
 class Pruner(Compressor):
     
     def __init__(self, dataset, sparsity, iterative_steps=5, retrainer: Trainer=None, device="cuda") -> None:
+        super().__init__()
         self.dataset = dataset
         self.sparsity = sparsity
         self.iterative_steps = iterative_steps

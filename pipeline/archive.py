@@ -18,7 +18,12 @@ class Archive:
         return add
     
     def add_information(self, info):
-        self.base_dir += "-[Info={}]".format(info)
+        if info:
+            self.base_dir += "-[Info={}]".format(info)
+        return self
+    
+    def add_tag(self, **kwargs):
+        self.base_dir += self.__combine(**kwargs)
         return self
     
     def get_weight_path(self, **kwargs):

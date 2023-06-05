@@ -4,6 +4,9 @@ from ...pipeline import Archive
 
 class Compressor:
     
+    def __init__(self) -> None:
+        self.archive = None
+    
     def set_archive(self, archive: Archive):
         self.archive = archive
     
