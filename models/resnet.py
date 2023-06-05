@@ -48,7 +48,7 @@ class BasicBlock(nn.Module):
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
-        return self.relu(inplace=True)(self.residual_function(x) + self.shortcut(x))
+        return self.relu(self.residual_function(x) + self.shortcut(x))
 
 class BottleNeck(nn.Module):
     """Residual block for resnet over 50 layers
