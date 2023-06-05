@@ -13,7 +13,7 @@ class TinyTrainer:
                  num_epochs, 
                  weight_decay=5e-4, 
                  criterion=None, 
-                 lr_milestone=None,
+                 lr_milestone="default",
                  device="cuda",
                  archive: Archive=None,
                  save_best=True) -> None:
@@ -29,7 +29,7 @@ class TinyTrainer:
         if not criterion:
             self.criterion = nn.CrossEntropyLoss()
         
-        if not lr_milestone:
+        if isinstance(lr_milestone, str) and lr_milestone == "default":
             # milestones: [20, 50, 80, 100] 四个挡
             self.lr_milestone = [int(num_epochs * 0.2), int(num_epochs * 0.5), int(num_epochs * 0.8)]
 
@@ -61,8 +61,8 @@ class TinyTrainer:
             optimizer = optim.SGD(model.parameters(), lr=self.lr, weight_decay=self.weight_decay, momentum=0.9)
 
         # 定义学习率衰减器
-        train_scheduler = optim.lr_scheduler.MultiStepLR(
-            optimizer, milestones=self.lr_milestone, gamma=0.2)
+        if self.lr_milestone:
+            train_scheduler = optim.lr_scheduler.MultiStepLR( optimizer, milestones=self.lr_milestone, gamma=0.2)
 
         # 日志
         logs = []
@@ -147,7 +147,7 @@ class TinyTrainer:
                 else:
                     save_interval = self.archive.save_interval
                 
-                if best_acc < train_correct / train_total:
+                if best_acc < val_correct / val_total:
                     # 保存并更新最新的best，保存的时候标注是最好模型，并标注当前的Epoch
                     # 删除上一个最好的
                     if best_epoch > 0:
@@ -155,16 +155,16 @@ class TinyTrainer:
                         os.remove(pre_best_path)
                     
                     best_epoch = epoch + 1
-                    best_acc = train_correct / train_total
+                    best_acc = val_correct / val_total
                     best_path = self.archive.get_weight_path(Type="BEST", E=best_epoch)
                     torch.save(model, best_path)
 
                 if (epoch + 1) % save_interval == 0 and epoch + 1 != self.num_epochs:
-                    weight_path = self.archive.get_weight_path(Type="MID", E=epoch+1)
+                    weight_path = self.archive.get_weight_path(Type="SAVE", E=epoch+1)
                     torch.save(model, weight_path)
                 
                 if epoch + 1 == self.num_epochs:
-                    weight_path = self.archive.get_weight_path(Type="FIN", E=epoch+1)
+                    weight_path = self.archive.get_weight_path(Type="LAST", E=epoch+1)
                     torch.save(model, weight_path)
                 
                 # 保存日志
