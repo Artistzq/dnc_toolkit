@@ -45,9 +45,9 @@ class DiffChaser(Finder):
         indicies = torch.argsort(-logits, dim=-1)
         
         if option == "index":
-            return logits[indicies[0]] - logits[indicies[ref]]
+            return (logits[indicies[0]] - logits[indicies[ref]]).item()
         elif option == "target":
-            return logits[indicies[0]] - logits[ref]
+            return (logits[indicies[0]] - logits[ref]).item()
         else:
             return -1
 
@@ -92,7 +92,7 @@ class DiffChaser(Finder):
             if (max_val < limit):
                 return True
         return False
-        
+    
     def mutate(self, x):
         mean = self.normalizer.mean
         std = self.normalizer.std
@@ -188,7 +188,7 @@ class DiffChaser(Finder):
         if not isinstance(datasource, torch.Tensor):
             images, labels = wrapper.to_tensor(datasource)
         else:
-            datasource = images
+            images = datasource
             
         result = []
         with Timer("Diff Chaser") as timer:
