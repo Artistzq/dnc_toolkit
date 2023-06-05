@@ -125,7 +125,8 @@ def to_tensor(datasource):
         raise ValueError()
 
 
-def get_plot_wrapper(mean, std):
+def get_plot_wrapper(mean_std):
+    mean, std = mean_std
     def func(images):
         return to_plotable(images, mean, std)
     return func
