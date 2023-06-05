@@ -3,6 +3,13 @@ import numpy as np
 import math
 
 class Uncertainty:
+    
+    probs_required = True
+    
+    @classmethod
+    def set_probs_required(cls, probs_required: bool):
+        cls.probs_required = probs_required
+    
     def __check(func):
         def wrapper(cls, probs, *args, **kwargs):
             cls.device = "cpu"
@@ -11,8 +18,9 @@ class Uncertainty:
             if isinstance(probs, np.ndarray):
                 probs = torch.Tensor(probs)
 
-            assert probs[0].sum() < 1.01 and probs[0].sum() > 0.98, "The sum of probabilities for each sample should be equal to 1. Consider using softmax correctly."
-            assert probs.ndim == 2, "Probs wrong shape: {}, shoud be (batch_size, class_num)".format(probs.shape)
+            if cls.probs_required:
+                assert probs[0].sum() < 1.01 and probs[0].sum() > 0.98, "The sum of probabilities for each sample should be equal to 1. Consider using softmax correctly."
+                assert probs.ndim == 2, "Probs wrong shape: {}, shoud be (batch_size, class_num)".format(probs.shape)
             # 从计算图分离
             probs = probs.to(cls.device).detach()
 

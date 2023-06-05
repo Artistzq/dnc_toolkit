@@ -8,8 +8,7 @@ import functools
 from . import reliability_diagrams as rd
 from .cka import CKA
 from .uncertainty import Uncertainty
-from .utils import deprecated
-from .utils import data_wrapper
+from .utils import deprecated, data_wrapper, Timer
 
 # TODO: Disrate Limit Decimal没用;convert之后没把device它变回去，也可能是我弄一半就暂停，导致没变回去
 # TODO: 直接打印结果，verbose选项
@@ -265,6 +264,15 @@ class ModelMetric:
         return names
     
     @check_and_convert
+    def get_logits(self, model):
+        with Timer("Inference", verbose=self.verbose):
+            logits = []
+            for X, y in self.testloader:
+                X = X.to(self.device)
+                logit = model(X)
+                logits.append(logit)
+        return torch.cat(logits)
+    
     def get_probs(self, model, temperature=1) -> torch.tensor:
         """返回模型model在温度为temperature下时对testloader输出的概率分布
 
@@ -275,12 +283,8 @@ class ModelMetric:
         Returns:
             torch.tensor: 概率分布, shape=(N, C)
         """
-        probs = []
-        for X, y in self.testloader:
-            X = X.to(self.device)
-            logits = model(X)
-            prob = torch.softmax(logits / temperature, dim=-1)
-            probs.append(prob)
+        logits = self.get_logits(model)
+        probs = torch.softmax(logits / temperature, dim=-1)
         return torch.cat(probs)
     
     def get_shape(self):
@@ -372,9 +376,9 @@ class ModelMetric:
         bins = np.linspace(0.0, 1.0, num_bins + 1)
         indices = np.digitize(confidences, bins, right=True)
 
-        bin_accuracies = np.zeros(num_bins, dtype=np.float)
-        bin_confidences = np.zeros(num_bins, dtype=np.float)
-        bin_counts = np.zeros(num_bins, dtype=np.int)
+        bin_accuracies = np.zeros(num_bins)
+        bin_confidences = np.zeros(num_bins)
+        bin_counts = np.zeros(num_bins)
         for b in range(num_bins):
             selected = np.where(indices == b + 1)[0]
             if len(selected) > 0:
