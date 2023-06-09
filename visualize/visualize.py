@@ -1,34 +1,27 @@
-# %%
-
 import matplotlib as mpl
-import numpy as np
- 
-# data = np.array(data).T
-# plt.bar()
-
-# plt.savefig("test.png", bbox_inches='tight', transparent=False)
-
-
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
 
+def imshow(image_group, titles=None):
+    b = 2
+    fig, axes = plt.subplots(len(image_group), len(image_group[0]), figsize=(len(image_group[0])*b, len(image_group)*b))
+    for i, images in enumerate(image_group):
+        for idx, image in enumerate(images):
+            axes[i][idx].imshow(image)
+            axes[i][idx].set_axis_off()
+            
+        if titles:
+            axes[i][idx].suptitle(titles[i])
 
-def im_show(X):
-    if len(X.shape) == 4:
-        X = X[0];
+    fig.show()
+
+
+def heatmap():
+    plt.imshow(cmap="inferno")
     
-    X = X.cpu().numpy()
-    X.swapaxes(0, 2)
-    X.swapaxes(0, 1)
     
-    
-
-
-
-
-
 
 label = ["class"+str(i) for i in range(10)]
 
@@ -62,66 +55,3 @@ def create_multi_bars(labels, datas, title, tick_step=1, group_gap=0.2, bar_gap=
     # plt.ylim(80, 100)
     # plt.show()
     plt.savefig("{}.png".format(title), bbox_inches='tight', transparent=False)
-
-
-# plt.savefig("test.png", bbox_inches='tight', transparent=False)
-
-# %%
-import os
-import matplotlib.pyplot as plt
-import json
-import numpy as np
-
-results = [item for item in os.listdir("./results") if "json" in item]
-
-for result in results:
-    path = os.path.join("./results", result)
-    name = "_".join(result.split("_")[:-1])
-    model_type = name.split("_")[0]
-    # 一个模型的数据
-    print(model_type)
-    records = json.load(open(path, "r"))
-    # 取origin model 和 前4次ban
-    records = records[:5]
-    all_acc = [round(record["acc"]* 100, 2) for record in records]
-    all_ece_10 = [round(record["ece_10"] * 100, 2) for record in records]
-    all_nfr = [record.get("nfr", 0) for record in records]
-    
-    # print("acc ", all_acc)
-    # print("ece ", all_ece_10)
-    # print("nfr ", all_nfr)
-    
-    data = []
-    all_class_acc = [record["class_acc"] for record in records]
-    # for i in range(len(all_class_acc)):
-    #     data.append(np.array(all_class_acc[i]) - np.array(all_class_acc[0]).tolist())
-    data = all_class_acc
-    labels = ["class " + str(i) for i in range(10)]
-    # print(all_class_acc)
-    # print(data)
-    create_multi_bars(labels, data, model_type, group_gap=0.5)
-    # print(all_class_acc)
-    # fig, axes=plt.subplots(1, 3, figsize=(12, 4))
-    # axes[0].plot(range(len(data)), accs)
-    # axes[0].set_title("acc")
-    # axes[1].plot(range(len(data)), ece_10s)
-    # axes[1].set_title("ece_10")
-    # axes[2].plot(range(len(data)), ece_15s)
-    # axes[2].set_title("ece_15")
-    # fig.suptitle(result)
-    # fig.tight_layout()
-    
-#     fig.savefig(args.path + "_pngs/{}_".format(result) + ".png", bbox_inches='tight', transparent=False)
-
-# with open("./results/resnet18_15ep/results.txt") as f:
-#     data = f.readlines()
-
-# data = data[:4]
-# data = [item.split(":")[-1] for item in data]
-# data = [[float(v) for v in item.split(" ")] for item in data]
-
-
-# %%
-
-
-

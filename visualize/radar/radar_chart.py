@@ -29,6 +29,9 @@ def radar_chart(
     grid_line_color: str = "#888888",
     grid_line_width: float = 0.3,
     legend_position: Tuple[float, float] = (1.0, 1.0),
+    lengend_size: int = 8,
+    linestyle: str = "-",
+    rlim : Tuple[float, float] = None,
     save_path: Optional[str] = None,
 ) -> None:
     """Plot a radar/spider chart.
@@ -69,6 +72,8 @@ def radar_chart(
         Line width of the grid, by default 0.3
     legend_position : Tuple[float, float], optional
         Postion of the legend, by default (1.0, 1.0)
+    legend_size : int, optional
+        Size of the legend, by default 8
     save_path : Optional[str], optional
         Path to save your radar chart to, by default None
 
@@ -115,6 +120,9 @@ def radar_chart(
 
     theta = np.arange(len(labels) + 1) / float(len(labels)) * 2 * np.pi
 
+    if rlim:
+        ax.set_rlim(rlim[0], rlim[1])
+    
     # Draw the marksers/line and polygon
     for index, value in enumerate(values):
         value = np.append(value, value[0])
@@ -134,6 +142,7 @@ def radar_chart(
             theta,
             value,
             marker="o",
+            linestyle=linestyle,
             markersize=marker_size,
             linewidth=line_width,
             label=str(group),
@@ -142,7 +151,7 @@ def radar_chart(
         ax.fill(theta, value, alpha=fill_alpha)
 
         if len(values) != 1:
-            ax.legend(loc="best", bbox_to_anchor=legend_position, frameon=False)
+            ax.legend(loc="best", bbox_to_anchor=legend_position, frameon=False, prop={"size": lengend_size})
 
     # Set ticks and labels
     plt.xticks(theta[:-1], labels, color=label_color, size=label_size)
