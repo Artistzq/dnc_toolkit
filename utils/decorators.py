@@ -1,5 +1,6 @@
 from functools import wraps
 import warnings
+from .context_manager import Timer
 
 
 def return_string(keys):
@@ -46,5 +47,17 @@ def deprecated(reason=None, new=None):
                           category=DeprecationWarning,
                           stacklevel=2)
             return func(*args, **kwargs)
+        return new_func
+    return decorator
+
+
+def verbose(task):
+    def decorator(func):
+        @wraps(func)
+        def new_func(*args, **kwargs):
+            with Timer(task, verbose=args[0].verbose):
+                res = func(*args, **kwargs)
+            print("{}: {}".format(task, res))
+            return res
         return new_func
     return decorator
