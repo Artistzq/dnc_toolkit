@@ -133,7 +133,7 @@ class GoogleNet(nn.Module):
 
         return x
 
-def googlenet():
-    return GoogleNet()
+def googlenet(num_class):
+    return GoogleNet(num_class=num_class)
 
 

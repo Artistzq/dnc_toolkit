@@ -114,8 +114,8 @@ class PreActResNet(nn.Module):
 
         return x
 
-def preactresnet18():
-    return PreActResNet(PreActBasic, [2, 2, 2, 2])
+def preactresnet18(num_classes):
+    return PreActResNet(PreActBasic, [2, 2, 2, 2], class_num=num_classes)
 
 def preactresnet34():
     return PreActResNet(PreActBasic, [3, 4, 6, 3])

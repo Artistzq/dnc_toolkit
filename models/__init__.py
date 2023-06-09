@@ -17,6 +17,8 @@ from .cifar_style_resnet import resnet32
 from .cifar_style_resnet import resnet44
 from .cifar_style_resnet import resnet56
 from .cifar_style_resnet import resnet110
+from .cifar_style_resnet import resnet164
+from .cifar_style_densnet import DenseNet40
 from .resnet import resnet18
 from .resnet import resnet34
 from .resnet import resnet50
@@ -84,13 +86,15 @@ def get_network(net, num_class, gpu=True, weight=None) -> torch.nn.Module:
     if args.net == 'cnn':
         net = CNN5Layer()
     elif args.net == 'vgg16':
-        net = vgg16_bn()
+        net = vgg16_bn(num_class)
     elif args.net == 'vgg13':
-        net = vgg13_bn()
+        net = vgg13_bn(num_class)
     elif args.net == 'vgg11':
-        net = vgg11_bn()
+        net = vgg11_bn(num_class)
     elif args.net == 'vgg19':
-        net = vgg19_bn()
+        net = vgg19_bn(num_class)
+    elif args.net == 'densenet40':
+        net = DenseNet40(num_classes=num_class)
     elif args.net == 'densenet121':
         net = densenet121()
     elif args.net == 'densenet161':
@@ -100,13 +104,13 @@ def get_network(net, num_class, gpu=True, weight=None) -> torch.nn.Module:
     elif args.net == 'densenet201':
         net = densenet201()
     elif args.net == 'googlenet':
-        net = googlenet()
+        net = googlenet(num_class)
     elif args.net == 'inceptionv3':
-        net = inceptionv3()
+        net = inceptionv3(num_class)
     elif args.net == 'inceptionv4':
-        net = inceptionv4()
+        net = inceptionv4(num_class)
     elif args.net == 'inceptionresnetv2':
-        net = inception_resnet_v2()
+        net = inception_resnet_v2(inceptionv3)
     elif args.net == 'xception':
         net = xception()
     elif args.net == 'resnet20':
@@ -119,6 +123,8 @@ def get_network(net, num_class, gpu=True, weight=None) -> torch.nn.Module:
         net = resnet56(num_class)
     elif args.net == 'resnet110':
         net = resnet110(num_class)
+    elif args.net == 'resnet164':
+        net = resnet164(num_class)
     elif args.net == 'resnet18':
         net = resnet18(num_class)
     elif args.net == 'resnet34':
@@ -189,6 +195,10 @@ def get_network(net, num_class, gpu=True, weight=None) -> torch.nn.Module:
         net = net.cuda()
         
     if weight:
-        net.load_state_dict(torch.load(weight))
-        
+        weight = torch.load(weight)
+        if isinstance(weight, torch.nn.Module):
+            return weight
+        else:
+            net.load_state_dict(weight)
+
     return net
