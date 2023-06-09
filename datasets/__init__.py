@@ -1,7 +1,9 @@
 # from .cv_datasets import *
 from . import cv_datasets as CVD
 from . import backdoor_datasets as BKD
+from . import gan_dataset as GD
 from .backdoor_datasets import PoisonArgs
+from .cv_datasets import Dataset
 
 from .ood_datasets import get_corrupt_dataset
 
@@ -11,7 +13,7 @@ CIFAR100_MEAN_STD = ([0.507, 0.487, 0.441], [0.267, 0.256, 0.276])
 TINY_IMAGENET_MEAN_STD = ([0.507, 0.487, 0.441], [0.267, 0.256, 0.276])
 
 
-def get_dataset(dataset_name, batch_size=128, augmented=True, num_workers=4, root="./data", normalization=None):
+def get_dataset(dataset_name, batch_size=128, augmented=True, num_workers=4, root="./data", normalization=None) -> Dataset:
     print("======> Get Clean Data: {}".format(dataset_name))
     if dataset_name == "TinyImageNet":
         dataset = CVD.TinyImageNet(batch_size, num_workers, augmented, root, normalization)
@@ -21,6 +23,8 @@ def get_dataset(dataset_name, batch_size=128, augmented=True, num_workers=4, roo
         dataset = CVD.CIFAR100(batch_size, num_workers, augmented, root, normalization)
     elif dataset_name == "SVHN":
         dataset = CVD.SVHN(batch_size, num_workers, augmented, root, normalization)
+    elif dataset_name == "GCIFAR10":
+        dataset = GD.FakeCIFAR10(root+"/gan-cifar10-folder/train", None, batch_size, num_workers, augmented, root, normalization)
     return dataset
 
 
