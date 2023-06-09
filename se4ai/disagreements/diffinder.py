@@ -1,9 +1,12 @@
 import torch
 import torch.nn as nn
 from torchattacks.attack import Attack
+import torch.nn.functional as F
 
-from ...datasets import wrapper
 from .finder import Finder
+from .diffchaser import DiffChaser
+from .utils import Uncertainty, RevLoss, wrapper
+
 
 class Diffinder(Attack, Finder):
     r"""
@@ -28,7 +31,7 @@ class Diffinder(Attack, Finder):
         >>> adv_images = attack(images, labels)
 
     """
-    def __init__(self, model, ref_model, eps=8/255, alpha=2/255, steps=10, distance_restrict=8/255, random_start=True, normalization=None):
+    def __init__(self, model, ref_model, ref_proxy=None, eps=8/255, alpha=2/255, steps=10, distance_restrict=8/255, random_start=True, normalization=None):
         
         super().__init__("PGD", model)
         self.eps = eps
@@ -39,9 +42,14 @@ class Diffinder(Attack, Finder):
         self.ref_model = ref_model
         self.distance = distance_restrict
         # self.loss = nn.MSELoss()
-        self.loss = nn.CrossEntropyLoss()
+        # self.loss = nn.CrossEntropyLoss()
+        self.loss = nn.KLDivLoss(reduction = "batchmean")
         if normalization is not None:
             self.set_normalization_used(normalization[0], normalization[1])
+        
+        self.blacked = ref_model
+        self.whited = model
+        self.proxy = ref_proxy
 
     def forward(self, images, labels):
         r"""
@@ -66,22 +74,34 @@ class Diffinder(Attack, Finder):
 
         for _ in range(self.steps):
             adv_images.requires_grad = True
-            outputs = self.get_logits(adv_images)
             
-            ref_logits = self.get_logits(adv_images, self.ref_model)
-            cost = self.loss(outputs, ref_logits) # MSE Loss
-            
+            # 代理与black的loss尽可能小
+            # whited与black的loss尽可能大
+
+            # black_logits = self.get_logits(adv_images, self.ref_model)
+            # proxy_logits = self.get_logits(adv_images, self.proxy)
+            black_logits = self.get_logits(adv_images, self.ref_model)
+            white_logits = self.get_logits(adv_images)
+
+            # cost = nn.MSELoss()(black_logits, white_logits)
+            cost = self.loss(
+                F.log_softmax(white_logits/4 + 1e-8, dim=1), 
+                F.softmax(black_logits/4, dim=1)
+            )
+            # cost2 = Uncertainty.margin(F.softmax(white_logits, dim=-1))
+            # cost2 = - cost2.sum() / cost2.numel()
+
             # Update adversarial images
             grad = torch.autograd.grad(cost, adv_images,
                                        retain_graph=False, create_graph=False)[0]
 
             adv_images = adv_images.detach() + self.alpha*grad.sign()
             delta = torch.clamp(adv_images - images, min=-self.eps, max=self.eps)
-            adv_images = torch.clamp(images + delta, min=images-self.distance, max=images+self.distance).detach()
+            adv_images = torch.clamp(images + delta, 0, 1).detach()
 
         return adv_images
 
-    def get_logits(self, inputs, model=None, labels=None, *args, **kwargs):
+    def get_logits(self, inputs, model=None, labels=None, *args, **kwargs) -> torch.Tensor:
         if model is None:
             return super().get_logits(inputs, labels, *args, **kwargs)
         else:
@@ -92,21 +112,13 @@ class Diffinder(Attack, Finder):
         
     def find(self, datasource, save_path=None):
         images, labels = wrapper.to_tensor(datasource)
+        founded = self.__call__(images, labels)
         if save_path:
-            torch.save(images, save_path)
-        return self.forward(images, labels)
-
-
-class RevLoss(nn.Module):
-    def __init__(self, loss) -> None:
-        super().__init__()
-        self.loss = loss
-    
-    def forward(self, output, target):
-        return - self.loss(output, target)
+            torch.save(founded, save_path)
+        return founded
 
 
 class SameFinder(Diffinder):
     def __init__(self, model, ref_model, eps=8 / 255, alpha=2 / 255, steps=10, distance_restrict=8 / 255, random_start=True, normalization=None):
         super().__init__(model, ref_model, eps, alpha, steps, distance_restrict, random_start, normalization)
-        self.loss = RevLoss(nn.CrossEntropyLoss())
+        self.loss = RevLoss(self.loss)
