@@ -4,6 +4,7 @@ import random
 import numpy as np
 from torchvision.transforms import transforms
 import torch.nn.functional as F
+import os
 
 from .finder import Finder
 from .utils import wrapper, deprecated, Denormalize, Timer
@@ -20,7 +21,8 @@ class DiffChaser(Finder):
                  cross_rate=0.5,
                  mutate_rate=0.01,
                  distance_restrict=8/255,
-                 verbose=False) -> None:
+                 verbose=False, 
+                 log_path=None) -> None:
         # super().__init__()
         self.model1 = model1
         self.model2 = model2
@@ -32,6 +34,7 @@ class DiffChaser(Finder):
         self.mutate_rate = mutate_rate
         self.pixel_limit = int(distance_restrict * 255)
         self.verbose = verbose
+        self.log_path = log_path
         
     def init_population(self, x):
         population = []
@@ -154,12 +157,18 @@ class DiffChaser(Finder):
             if self.timeout > 0 and time.perf_counter() - start > self.timeout:
                 if self.verbose:
                     print("Failed. Can not find any disagreements in limit time {:.3f} seconds. Return mutated.".format(self.timeout))
+                if self.log_path:
+                    with open(self.log_path, "a+") as f:
+                        f.write("Failed. Can not find any disagreements in limit time {:.3f} seconds. Return mutated.\n".format(self.timeout))
                 return population[0]
             
             for sample in population:
                 if not self.agree(sample):
                     if self.verbose:
                         print("Successed. Quit before gen {} with a disagreement in {:.3f} seconds.".format(generation, (time.perf_counter() - start)))
+                    if self.log_path:
+                        with open(self.log_path, "a+") as f:
+                            f.write("Successed. Quit before gen {} with a disagreement in {:.3f} seconds.\n".format(generation, (time.perf_counter() - start)))
                     return sample
             
             pop1 = self.tournament_select(population, self.model1, len(population) // 2, 4)
@@ -182,6 +191,10 @@ class DiffChaser(Finder):
 
         if self.verbose:
             print("Failed. Can not find any disagreements in limit {} iterations. Return mutated.".format(iteration))
+        if self.log_path:
+            with open(self.log_path, "a+") as f:
+                f.write("Failed. Can not find any disagreements in limit {} iterations. Return mutated.\n".format(iteration))
+
         return population[0]
     
     def find(self, datasource, save_path=None):
@@ -197,7 +210,9 @@ class DiffChaser(Finder):
             result = torch.stack(result)
         if self.verbose:
             print("Time cosumption: {:.3f} s".format(timer.get_elapsed_time()))
-        
+        if self.log_path:
+            with open(self.log_path, "a+") as f:
+                f.write("Time cosumption: {:.3f} s\n".format(timer.get_elapsed_time()))
         if save_path:
             torch.save(result, save_path)
         return result
