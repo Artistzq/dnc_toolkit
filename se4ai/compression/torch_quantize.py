@@ -6,9 +6,10 @@ from torch import nn
 
 class TorchQuantizer(Compressor):
     
-    def __init__(self, calib_loader) -> None:
+    def __init__(self, calib_loader, verbose=True) -> None:
         super().__init__()
         self.calib_loader = calib_loader
+        self.verbose = verbose
         
     def compress(self, model):
         model = self.process(model)
@@ -22,19 +23,29 @@ class TorchQuantizer(Compressor):
         model_prepare.eval()
         model_prepare = model_prepare.to("cpu")
         
+        if self.verbose:
+            print("Set quantization config...")
         # 设置量化方式
         qconfig_dict = {"": get_default_qconfig(backend='fbgemm')}
         model_prepare = quantize_fx.prepare_fx(model=model_prepare, qconfig_dict=qconfig_dict)
         model_prepare.eval()
 
+        if self.verbose:
+            print("Calibrating...")
         # 标定，确定Activation的量化范围
         if calib_loader is not None:
             for X, y in calib_loader:
                 model_prepare(X)
+        if self.verbose:
+            print("Calibrated!")
 
+        if self.verbose:
+            print("Converting...")
         # 根据之前设置的量化方式以及标定计算的参数， 进行模型转换， FP32--> INT8
         quantized_model = quantize_fx.convert_fx(graph_module=model_prepare)
         quantized_model.eval()
+        if self.verbose:
+            print("Converted!")
         
         return quantized_model
     
@@ -55,6 +66,7 @@ class TorchQuantizer(Compressor):
         
         quantized_model.load_state_dict(torch.load(weight_path))
         
+        quantized_model = quantized_model.cpu()
         return quantized_model
 
 

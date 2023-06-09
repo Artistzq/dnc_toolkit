@@ -50,6 +50,7 @@ class Pruner(Compressor):
             # finetune your model here
             # finetune(model)
             if self.retrainer:
+                self.retrainer.archive.set_tag(PStep=i+1)
                 model = self.retrainer.train(model, self.dataset.train_loader, self.dataset.test_loader, "SGD")
             print("Prune steps: [{}], FLOPs: {} G, Params: {} MB, Acc: {:.2f}%".format(
                 i + 1, ModelMetric.flops(model, shape, "MB"), ModelMetric.params(model, shape), 100 * metric.accuracy(model)
