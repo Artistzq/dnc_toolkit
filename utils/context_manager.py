@@ -50,8 +50,8 @@ class Timer:
     
     def get_elapsed_time(self):
         if self.unit == 's':
-            return round(self.elapsed_time, 3)
+            return round(time.time() - self.start_time, 3)
         elif self.unit == 'ms':
-            return round(self.elapsed_time * 1000, 3)
+            return round((time.time() - self.start_time) * 1000, 3)
         else:
             raise ValueError(f"Invalid unit '{self.unit}'")
