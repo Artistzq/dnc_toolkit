@@ -9,16 +9,28 @@ from .utils import wrapper
 
 class CWDiffinder(CW, Finder):
     
-    def __init__(self, white_model, black_model, c=1, kappa=0, steps=50, lr=0.01):
+    def __init__(self, white_model, black_model, c=1, kappa=0, steps=50, lr=0.01, normalization=None, lamb=1):
         super(CWDiffinder, self).__init__(white_model, c, kappa, steps, lr)
         self.black_model = black_model
+        if normalization is not None:
+            self.set_normalization_used(normalization[0], normalization[1])
+        else:
+            print("Warn: not set normalization")
+        self.lamb = c
     
     def find(self, datasource, save_path=None):
-        images, labels = wrapper.to_tensor(datasource)
-        founded = self.__call__(images, labels)
+        loader = wrapper.to_loader(datasource)
+        all_results = []
+        for images, labels in loader:
+            founded = self.__call__(images, labels)
+            all_results.append(founded)
+        founded = torch.vstack(all_results)
         if save_path:
             torch.save(founded, save_path)
         return founded
+    
+    def add_loss(self, L2_loss, f_loss):
+        return L2_loss + self.c*f_loss
     
     def forward(self, images, labels):
         r"""
@@ -61,7 +73,8 @@ class CWDiffinder(CW, Finder):
             else:
                 f_loss = self.f(outputs, black_labels).sum()
 
-            cost = L2_loss + self.c*f_loss
+            cost = self.add_loss(L2_loss, f_loss)
+            # cost = L2_loss + self.c*f_loss
 
             optimizer.zero_grad()
             cost.backward()
@@ -96,3 +109,8 @@ class CWDiffinder(CW, Finder):
                 inputs = self.normalize(inputs)
             logits = from_model(inputs)
             return logits
+
+
+class CWSameFinder(CWDiffinder):
+    def add_loss(self, L2_loss, f_loss):
+        return - super().add_loss(L2_loss, f_loss)

@@ -123,7 +123,16 @@ def to_tensor(datasource):
         return datasource
     else:
         raise ValueError()
-
+    
+def to_loader(datasource, batch_size=128, shuffle=False, num_works=4):
+    if isinstance(datasource, DataLoader):
+        return datasource
+    elif isinstance(datasource, Dataset):
+        return dataset_to_loader(datasource, batch_size, shuffle, num_works)
+    elif isinstance(datasource, tuple):
+        return tensor_to_loader(datasource[0], datasource[1], batch_size, shuffle, num_works)
+    else:
+        raise ValueError()
 
 def get_plot_wrapper(mean_std):
     mean, std = mean_std

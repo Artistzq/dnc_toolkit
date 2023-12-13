@@ -207,14 +207,16 @@ class DiffChaser(Finder):
         with Timer("Diff Chaser") as timer:
             for single_x in images:
                 result.append(self.genetic_algorithm(single_x))
+                if save_path:
+                    torch.save(torch.stack(result), save_path)
             result = torch.stack(result)
         if self.verbose:
             print("Time cosumption: {:.3f} s".format(timer.get_elapsed_time()))
         if self.log_path:
             with open(self.log_path, "a+") as f:
                 f.write("Time cosumption: {:.3f} s\n".format(timer.get_elapsed_time()))
-        if save_path:
-            torch.save(result, save_path)
+        # if save_path:
+        #     torch.save(result, save_path)
         return result
     
     @deprecated(new="Diffchaser.find")

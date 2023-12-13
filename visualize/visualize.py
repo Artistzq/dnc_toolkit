@@ -4,18 +4,34 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+# def imshow(image_group, titles=None):
+#     b = 2
+#     fig, axes = plt.subplots(len(image_group), len(image_group[0]), figsize=(len(image_group[0])*b, len(image_group)*b))
+#     for i, images in enumerate(image_group):
+#         for idx, image in enumerate(images):
+#             axes[i][idx].imshow(image)
+#             axes[i][idx].set_axis_off()
+            
+#         if titles:
+#             axes[i][idx].set_suptitle(titles[i])
+
+#     fig.show()
+
 def imshow(image_group, titles=None):
     b = 2
     fig, axes = plt.subplots(len(image_group), len(image_group[0]), figsize=(len(image_group[0])*b, len(image_group)*b))
     for i, images in enumerate(image_group):
         for idx, image in enumerate(images):
-            axes[i][idx].imshow(image)
-            axes[i][idx].set_axis_off()
-            
-        if titles:
-            axes[i][idx].suptitle(titles[i])
+            ax = axes[i][idx]
+            ax.imshow(image)
+            ax.set_axis_off()
 
-    fig.show()
+            # Add titles to the first subplot in each row
+            if idx == 0 and titles is not None:
+                ax.set_title(titles[i], rotation='vertical', ha='right')
+
+    plt.tight_layout()  # Adjust layout for better spacing
+    plt.show()
 
 
 def heatmap():

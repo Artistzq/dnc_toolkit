@@ -285,7 +285,7 @@ class ModelMetric:
         """
         logits = self.get_logits(model)
         probs = torch.softmax(logits / temperature, dim=-1)
-        return torch.cat(probs)
+        return probs
     
     def get_shape(self):
         """返回当前ModelMetric的数据集的图片的shape
@@ -463,7 +463,7 @@ class ModelMetric:
 
     @limit_decimal_places
     @check_and_convert
-    def disagree_rate(self, model1, model2):
+    def disagree_rate(self, model1, model2, restrict=False):
         """计算两个模型在testloader上的分歧率
 
         Args:
@@ -477,11 +477,16 @@ class ModelMetric:
         total = 0
         for X, y in self.testloader:
             X = X.to(self.device)
+            y = y.to(self.device)
             pred_m = torch.argmax(model1(X), dim=-1)
             pred_t = torch.argmax(model2(X), dim=-1)
-            dif += torch.count_nonzero(pred_m - pred_t)
+            
+            if restrict:
+                dif += ((y == pred_m) & (y != pred_t)).sum().item() + ((y != pred_m) & (y == pred_t)).sum().item()
+            else:
+                dif += torch.count_nonzero(pred_m - pred_t).item()
             total += pred_m.shape[0]
-        return dif.item() / total
+        return dif / total
 
     def clever(self, model, num_cases=100):
         
