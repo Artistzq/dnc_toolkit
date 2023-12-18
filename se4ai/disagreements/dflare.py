@@ -429,206 +429,207 @@ class DFlare(Finder):
         print("生成失败败败败败。")
         return self.img2tensor(best_img)
 
+if __name__ == "__main__":
 
-# %% [markdown]
-# # 测试
+    # %% [markdown]
+    # # 测试
 
-# %%
-import math
-import torch
-from skimage.metrics import peak_signal_noise_ratio, structural_similarity
+    # %%
+    import math
+    import torch
+    from skimage.metrics import peak_signal_noise_ratio, structural_similarity
 
-# 计算PSNR和SSIM
-def calculate_psnr_ssim(tensor1, tensor2):
-    psnr_value = peak_signal_noise_ratio(tensor1, tensor2, data_range=1.0)
-    ssim_value = structural_similarity(tensor1, tensor2, channel_axis=2)
-    return psnr_value, ssim_value
+    # 计算PSNR和SSIM
+    def calculate_psnr_ssim(tensor1, tensor2):
+        psnr_value = peak_signal_noise_ratio(tensor1, tensor2, data_range=1.0)
+        ssim_value = structural_similarity(tensor1, tensor2, channel_axis=2)
+        return psnr_value, ssim_value
 
-# 计算每对图像的PSNR和SSIM
-def calculate_image_metrics(image_list1, image_list2):
-    psnr_list = []
-    ssim_list = []
+    # 计算每对图像的PSNR和SSIM
+    def calculate_image_metrics(image_list1, image_list2):
+        psnr_list = []
+        ssim_list = []
 
-    for img1, img2 in zip(image_list1, image_list2):
-        psnr, ssim = calculate_psnr_ssim(img1, img2)
-        psnr_list.append(psnr)
-        ssim_list.append(ssim)
+        for img1, img2 in zip(image_list1, image_list2):
+            psnr, ssim = calculate_psnr_ssim(img1, img2)
+            psnr_list.append(psnr)
+            ssim_list.append(ssim)
 
-    return psnr_list, ssim_list
+        return psnr_list, ssim_list
 
 
-from toolkit.commons import *
-import math
+    from toolkit.commons import *
+    import math
 
-# setting_name = "TinyImageNet"
-# args = Args(setting_name)
+    # setting_name = "TinyImageNet"
+    # args = Args(setting_name)
 
-# # 读取数据集
-# dataset = get_dataset(args.dataset, batch_size=args.b)
+    # # 读取数据集
+    # dataset = get_dataset(args.dataset, batch_size=args.b)
 
-# # 读取模型
-# large = get_network(args.net, dataset.num_classes, weight=args.weight)
-# pmodel = torch.load(args.prune_weight)
-# # qmodel = TorchQuantizer.load_model(large, args.quant_weight)
-# # kd1 = get_network(args.kd1, dataset.num_classes, weight=args.kd1_weight)
-# # kd2 = get_network(args.kd2, dataset.num_classes, weight=args.kd2_weight)
+    # # 读取模型
+    # large = get_network(args.net, dataset.num_classes, weight=args.weight)
+    # pmodel = torch.load(args.prune_weight)
+    # # qmodel = TorchQuantizer.load_model(large, args.quant_weight)
+    # # kd1 = get_network(args.kd1, dataset.num_classes, weight=args.kd1_weight)
+    # # kd2 = get_network(args.kd2, dataset.num_classes, weight=args.kd2_weight)
 
-# smalls = {
-#     "P": pmodel,
-#     # "KD1": kd1,
-#     # "KD2": kd2,
-#     # "Q": qmodel
-# }
+    # smalls = {
+    #     "P": pmodel,
+    #     # "KD1": kd1,
+    #     # "KD2": kd2,
+    #     # "Q": qmodel
+    # }
 
-# for i, (name, model) in enumerate(smalls.items()):
-#     device = 'cpu' if name == "Q" else "cuda"
-#     white_model = model
-#     black_model = large
-#     if name == "Q":
-#         white_model, black_model = black_model, white_model
-#     white_model.to(device)
-#     black_model.to(device)
+    # for i, (name, model) in enumerate(smalls.items()):
+    #     device = 'cpu' if name == "Q" else "cuda"
+    #     white_model = model
+    #     black_model = large
+    #     if name == "Q":
+    #         white_model, black_model = black_model, white_model
+    #     white_model.to(device)
+    #     black_model.to(device)
 
-#     same_tensor = SameFinder.find_images(large, model, 10, dataset.test_loader, device=device, agreement=True)
+    #     same_tensor = SameFinder.find_images(large, model, 10, dataset.test_loader, device=device, agreement=True)
 
-#     dflare = DFlare(
-#         BlackOutputGetter(model),
-#         BlackOutputGetter(large),
-#         timeout=20, 
-#         delta=1e-3,
-#         normalization=MEAN_STDs[setting_name],
-#         device=device
-#     )
+    #     dflare = DFlare(
+    #         BlackOutputGetter(model),
+    #         BlackOutputGetter(large),
+    #         timeout=20, 
+    #         delta=1e-3,
+    #         normalization=MEAN_STDs[setting_name],
+    #         device=device
+    #     )
 
-#     with Timer(task="DFlare") as timer:
-#         imgs = [dflare(x) for x in same_tensor[0]]
-#     imgs = torch.stack(imgs)
-    
-#     dr = ModelMetric(wrapper.to_loader((imgs, same_tensor[1]))).disagree_rate(large, model)
-    
-#     # 调用函数计算PSNR和SSIM
-    
-#     W = wrapper.get_plot_wrapper(MENAs[setting_name])
-#     psnr_values, ssim_values = calculate_image_metrics(W(same_tensor[0]), W(imgs))
-
-#     print(setting_name)
-#     print(name)
-#     filtered_psnr_values = [num for num in psnr_values if not math.isinf(num)]
-#     print("PSNR values:", sum(filtered_psnr_values) / len(filtered_psnr_values))
-#     print("SSIM values:", sum(ssim_values) / len(ssim_values))
-#     print("SR: {}%".format(round(dr * 100, 2)))
-#     # print("Time: {}s".format(times[i]))
-    
-
-# %%
-def show_result(datasets, image_nums):
-    setting_name = datasets
-    args = Args(setting_name)
-
-    # 读取数据集
-    dataset = get_dataset(args.dataset, batch_size=args.b)
-
-    # 读取模型
-    large = get_network(args.net, dataset.num_classes, weight=args.weight)
-    pmodel = torch.load(args.prune_weight)
-    qmodel = TorchQuantizer.load_model(large, args.quant_weight)
-    kd1 = get_network(args.kd1, dataset.num_classes, weight=args.kd1_weight)
-    kd2 = get_network(args.kd2, dataset.num_classes, weight=args.kd2_weight)
-
-    smalls = {
-        # "P": pmodel,
-        # "KD1": kd1,
-        # "KD2": kd2,
-        "Q": qmodel
-    }
-
-    for i, (name, model) in enumerate(smalls.items()):
-        device = 'cpu' if name == "Q" else "cuda"
-        # white_model = model
-        # black_model = large
-        # if name == "Q":
-        #     white_model, black_model = black_model, white_model
-        # white_model = white_model.to(device)
-        # black_model = black_model.to(device)
+    #     with Timer(task="DFlare") as timer:
+    #         imgs = [dflare(x) for x in same_tensor[0]]
+    #     imgs = torch.stack(imgs)
         
-        large = large.to(device)
-        model = model.to(device)
+    #     dr = ModelMetric(wrapper.to_loader((imgs, same_tensor[1]))).disagree_rate(large, model)
         
+    #     # 调用函数计算PSNR和SSIM
+        
+    #     W = wrapper.get_plot_wrapper(MENAs[setting_name])
+    #     psnr_values, ssim_values = calculate_image_metrics(W(same_tensor[0]), W(imgs))
+
+    #     print(setting_name)
+    #     print(name)
+    #     filtered_psnr_values = [num for num in psnr_values if not math.isinf(num)]
+    #     print("PSNR values:", sum(filtered_psnr_values) / len(filtered_psnr_values))
+    #     print("SSIM values:", sum(ssim_values) / len(ssim_values))
+    #     print("SR: {}%".format(round(dr * 100, 2)))
+    #     # print("Time: {}s".format(times[i]))
         
 
-        same_tensor = SameFinder.find_images(large, model, image_nums, dataset.test_loader, device=device, agreement=True)
+    # %%
+    def show_result(datasets, image_nums):
+        setting_name = datasets
+        args = Args(setting_name)
 
-        
-        dflare = DFlare(
-            BlackOutputGetter(model),
-            BlackOutputGetter(large),
-            timeout=20, 
-            delta=1e-3,
-            normalization=MEAN_STDs[setting_name],
-            device=device
-        )
+        # 读取数据集
+        dataset = get_dataset(args.dataset, batch_size=args.b)
 
-        with Timer(task=name) as timer:
-            imgs = [dflare(x) for x in same_tensor[0]]
-        imgs = torch.stack(imgs)
-        dr = ModelMetric(wrapper.to_loader((imgs, same_tensor[1])), use_gpu=False).disagree_rate(large, model)
-        # 调用函数计算PSNR和SSIM
-        
-        W = wrapper.get_plot_wrapper(MENAs[setting_name])
-        psnr_values, ssim_values = calculate_image_metrics(W(same_tensor[0]), W(imgs))
+        # 读取模型
+        large = get_network(args.net, dataset.num_classes, weight=args.weight)
+        pmodel = torch.load(args.prune_weight)
+        qmodel = TorchQuantizer.load_model(large, args.quant_weight)
+        kd1 = get_network(args.kd1, dataset.num_classes, weight=args.kd1_weight)
+        kd2 = get_network(args.kd2, dataset.num_classes, weight=args.kd2_weight)
 
-        print(setting_name)
-        print(name)
-        filtered_psnr_values = [num for num in psnr_values if not math.isinf(num)]
-        print("PSNR values:", sum(filtered_psnr_values) / len(filtered_psnr_values))
-        print("SSIM values:", sum(ssim_values) / len(ssim_values))
-        print("SR: {}%".format(round(dr * 100, 2)))
-    return same_tensor, W, imgs
+        smalls = {
+            # "P": pmodel,
+            # "KD1": kd1,
+            # "KD2": kd2,
+            "Q": qmodel
+        }
 
-# %%
-same_tensor, W, imgs = show_result("CIFAR10", 10)
-
-# %%
-print(same_tensor[0].shape)
-print(imgs.shape)
-
-# %%
-import matplotlib as mpl
-import matplotlib
-import matplotlib.pyplot as plt
-import numpy as np
-
-
-def imshow(image_group, y_labels=None):
-    b = 2
-    fig, axes = plt.subplots(len(image_group), len(image_group[0]), figsize=(len(image_group[0])*b, len(image_group)*b))
-
-    # Add y_labels to the leftmost column
-    if y_labels:
-        for i, label in enumerate(y_labels):
-            axes[i, 0].set_ylabel(label, rotation=90, ha='center', va='center')
+        for i, (name, model) in enumerate(smalls.items()):
+            device = 'cpu' if name == "Q" else "cuda"
+            # white_model = model
+            # black_model = large
+            # if name == "Q":
+            #     white_model, black_model = black_model, white_model
+            # white_model = white_model.to(device)
+            # black_model = black_model.to(device)
             
-            # Remove y-axis ticks
-            axes[i, 0].set_yticks([])
+            large = large.to(device)
+            model = model.to(device)
+            
+            
 
-    for i, images in enumerate(image_group):
-        for idx, image in enumerate(images):
-            ax = axes[i][idx]
-            ax.imshow(image)
+            same_tensor = SameFinder.find_images(large, model, image_nums, dataset.test_loader, device=device, agreement=True)
 
-            # Remove x-axis ticks
-            ax.set_xticks([])
-            ax.set_yticks([])
+            
+            dflare = DFlare(
+                BlackOutputGetter(model),
+                BlackOutputGetter(large),
+                timeout=20, 
+                delta=1e-3,
+                normalization=MEAN_STDs[setting_name],
+                device=device
+            )
 
-    plt.show()
+            with Timer(task=name) as timer:
+                imgs = [dflare(x) for x in same_tensor[0]]
+            imgs = torch.stack(imgs)
+            dr = ModelMetric(wrapper.to_loader((imgs, same_tensor[1])), use_gpu=False).disagree_rate(large, model)
+            # 调用函数计算PSNR和SSIM
+            
+            W = wrapper.get_plot_wrapper(MENAs[setting_name])
+            psnr_values, ssim_values = calculate_image_metrics(W(same_tensor[0]), W(imgs))
 
-# %%
-imshow([W(same_tensor[0][:10]), W(imgs[:10])], y_labels=['Origin', 'DF'])
+            print(setting_name)
+            print(name)
+            filtered_psnr_values = [num for num in psnr_values if not math.isinf(num)]
+            print("PSNR values:", sum(filtered_psnr_values) / len(filtered_psnr_values))
+            print("SSIM values:", sum(ssim_values) / len(ssim_values))
+            print("SR: {}%".format(round(dr * 100, 2)))
+        return same_tensor, W, imgs
 
-# %%
-torch.save(imgs, "imgs.pt")
+    # %%
+    same_tensor, W, imgs = show_result("CIFAR10", 10)
 
-# %%
+    # %%
+    print(same_tensor[0].shape)
+    print(imgs.shape)
+
+    # %%
+    import matplotlib as mpl
+    import matplotlib
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+
+    def imshow(image_group, y_labels=None):
+        b = 2
+        fig, axes = plt.subplots(len(image_group), len(image_group[0]), figsize=(len(image_group[0])*b, len(image_group)*b))
+
+        # Add y_labels to the leftmost column
+        if y_labels:
+            for i, label in enumerate(y_labels):
+                axes[i, 0].set_ylabel(label, rotation=90, ha='center', va='center')
+                
+                # Remove y-axis ticks
+                axes[i, 0].set_yticks([])
+
+        for i, images in enumerate(image_group):
+            for idx, image in enumerate(images):
+                ax = axes[i][idx]
+                ax.imshow(image)
+
+                # Remove x-axis ticks
+                ax.set_xticks([])
+                ax.set_yticks([])
+
+        plt.show()
+
+    # %%
+    imshow([W(same_tensor[0][:10]), W(imgs[:10])], y_labels=['Origin', 'DF'])
+
+    # %%
+    torch.save(imgs, "imgs.pt")
+
+    # %%
 
 
 
