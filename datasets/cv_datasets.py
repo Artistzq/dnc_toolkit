@@ -6,6 +6,7 @@
 import torch
 from torchvision import datasets, transforms
 import os
+import torchvision
 
 class Dataset:
     
@@ -98,4 +99,31 @@ class TinyImageNet(Dataset):
         valid_dir = os.path.join(root, 'tiny-imagenet-200/val/images')
         self.trainset =  datasets.ImageFolder(train_dir, transform=self.augmented)
         self.testset =  datasets.ImageFolder(valid_dir, transform=self.normalized)
+        self.set_loader()
+
+
+class ImageNet(Dataset):
+    def __init__(self, batch_size=256, num_workers=8, augmented=True, root="./data", normalization=None):
+        if normalization is None:
+            normalization = ([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+
+        super(ImageNet, self).__init__(
+            224, 1000, 1281167, 50000, normalization, batch_size, num_workers
+        )
+        self.augmented = transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            self.normalize
+        ])
+        if not augmented:
+            self.augmented = self.normalized
+
+        train_dir = os.path.join(root, 'imagenet/train')
+        valid_dir = os.path.join(root, 'imagenet/val')
+        imagenet_root = os.path.join(root, "imagenet")
+        # TODO 加载真实训练集
+        self.trainset = datasets.ImageFolder(valid_dir, self.augmented)
+        
+        self.testset = datasets.ImageFolder(valid_dir, self.augmented)
         self.set_loader()

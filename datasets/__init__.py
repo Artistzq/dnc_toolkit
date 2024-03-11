@@ -10,8 +10,8 @@ from .ood_datasets import get_corrupt_dataset
 
 CIFAR10_MEAN_STD = ([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 CIFAR100_MEAN_STD = ([0.507, 0.487, 0.441], [0.267, 0.256, 0.276])
-TINY_IMAGENET_MEAN_STD = ([0.507, 0.487, 0.441], [0.267, 0.256, 0.276])
-
+TINY_IMAGENET_MEAN_STD = [0.4802,  0.4481,  0.3975], [0.2302, 0.2265, 0.2262]
+IMAGENET_MEAN_STD = ([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 
 def get_dataset(dataset_name, batch_size=128, augmented=True, num_workers=4, root="./data", normalization=None) -> Dataset:
     print("======> Get Clean Data: {}".format(dataset_name))
@@ -25,6 +25,8 @@ def get_dataset(dataset_name, batch_size=128, augmented=True, num_workers=4, roo
         dataset = CVD.SVHN(batch_size, num_workers, augmented, root, normalization)
     elif dataset_name == "GCIFAR10":
         dataset = GD.FakeCIFAR10(root+"/gan-cifar10-folder/train", None, batch_size, num_workers, augmented, root, normalization)
+    elif dataset_name == "ImageNet":
+        dataset = CVD.ImageNet(batch_size, num_workers, augmented, root, normalization)
     return dataset
 
 
