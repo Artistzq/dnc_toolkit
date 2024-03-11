@@ -1,134 +1,136 @@
 # dnc_toolkit
 Deep Network Compress Toolkit for Paper
 
-## 使用
-0. 架构
+## Introduction
+A comprehensive toolkit that supports the entire process from model training to model compression. It supports CIFAR10, CIFAR100, TinyImageNet, ImageNet, and multiple advanced architectures.
+In addition, multiple disagreement generation algorithms are supported, including DiffChaser, Diffinder, and DFLARE.
+
+## Architecture
+
 ``` bash
-project
+project_name
 ├─ data
 │  ├─ cifar-10-batches-py
 │  ├─ ...
+│  ├─ imagenet
 │  └─ Tiny-ImageNet-C
 ├─ toolkit
 │  ├─ datasets
 │  ├─ evaluate
+│  ├─ models
 │  ├─ ...
-│  └─ models
-├─ 1.py
-└─ 2.py
+│  ├─ pipeline
+│  └─ se4ai
+|      ├─ disagreements
+|      └─ compression
+├─ xxx.py
+└─ yyy.
 ```
+Example with ResNet110 and CIFAR10 dataset.
 
-1. 加载模型
-``` python
+### Training
+
+```python
 from toolkit.models import get_network
-resnet110 = get_network("resnet110", num_class=100, gpu=True)
-# 部分模型暂时没有实现num_class，可以自己添加上去并提交，见./models/__init__.py文件
-```
-2. 加载正常数据集和后门数据集
->>> 
+from toolkit.datasets import get_dataset
+from toolkit.pipeline import TinyTrainer as Trainer
 
-``` python
-from toolkit.datasets import get_dataset, get_poisoned_dataset, get_corrupt_dataset
-
-# 详细参数阅读源码
-dataset = get_dataset("CIFAR10", batch_size=128)
-dataset = get_poisoned_dataset("CIFAR10", batch_size=128)
-# 详细属性阅读源码
-train_loader = dataset.train_loader
-test_loader = dataset.test_loader
+resnet110 = get_network("resnet110", num_class=10, gpu=True)
+dataset = get_dataset("CIFAR10", batch_size=128, root="./data")
+trainer = Trainer(lr=0.1, num_epochs=200, weight_decay=1e-4, lr_milestone=[80, 120, 160])
+trainer.train(resnet110, dataset.train_loader, dataset.test_loader, optimizer="SGD")
 ```
-3. 加载C数据集
-``` python
-get_corrupt_dataset(
-    root,
-    dataset_name,
-    serverity,
-    as_loader=True,
-    ood_categories=None,
-    batch_size=100,
-    normalization=None,
+
+## Compression
+
+#### Pruning
+
+```python
+from toolkit.se4ai.compression import Pruner
+from toolkit.pipeline import TinyTrainer as Trainer
+
+large = get_network("resnet110", num_class=10, weight="xxx.pth")
+dataset = get_dataset("CIFAR10")
+# define finetuner
+retrainer = Trainer(lr=1e-2, num_epochs=40)
+pruner = Pruner(
+    dataset=dataset, 
+    sparsity=0.5, 
+    iterative_steps=5,
+    retrainer=retrainer
 )
-Docstring:
-1. 获取全部数据集，以loader形式
->>> test_loaders = get_corrupt_dataset(root="./data", dataset_name="CIFAR10", serverity=1, batch_size=128)
->>> test_loaders.keys()
->>> dict_keys(['jpeg_compression', 'shot_noise', 'elastic_transform', 'glass_blur', 'zoom_blur', 
-        'impulse_noise', 'speckle_noise', 'pixelate', 'motion_blur', 'gaussian_blur', 'frost', 
-        'defocus_blur', 'fog', 'snow', 'brightness', 'saturate', 'gaussian_noise', 'contrast', 'spatter'])
-        
->>> images, labels = test_loaders["speckle_noise"].__iter__().next()
->>> images.shape, labels.shape
->>> (torch.Size([128, 3, 32, 32]), torch.Size([128]))
-
-2. 获取指定污染类型的数据集，以Torch Dataset形式
->>> test_sets = get_corrupt_dataset(root="./data", dataset_name="TinyImageNet", serverity=2, as_loader=False,
-                ood_categories=["jpeg_compression","shot_noise"], normalization=self_normalization)
->>> single_image, single_label = test_sets["jpeg_compression"][0], test_sets["jpeg_compression"][1] 
->>> single_image.shape, single_label.shape
->>> (torch.Size([3, 32, 32]), torch.Size([]))
-
-Args:
-    root (str): 数据集目录
-    dataset_name (str): 数据集名称，CIFAR10 / CIFAR100 / TinyImageNet
-    serverity (int): 损坏程度
-    as_loader (bool, optional): 是否返回loader. Defaults to True.
-    ood_categories (list or tuple, optional): 哪些变种. Defaults to 全部.
-    batch_size (int, optional): Defaults to 100.
-    normalization (list or typle, optional): Defaults to 默认标准化.
-Returns:
-    Dict[str, TensorDataset or DataLoader]: 
+pruned = pruner.compress(large)
 ```
-4. 模型不确定性度量
-``` python
-# from toolkit.evaluate.uncertainty import Uncertainty
-from toolkit.evaluate import Uncertainty
 
-logits = resnet110(X)
-probs = torch.softmax(logits, dim=-1)
+#### Quantization
 
-# 方法里检查了概率分布probs是否合法
-entropy = Uncertainty.entropy(probs, norm=True)
-margin = Uncertainty.margin(probs)
+```python
+from toolkit.se4ai.compression import TorchQuantizer
+from toolkit.datasets import wrapper
 
+large = get_network("resnet110", num_class=10, weight="xxx.pth")
+dataset = get_dataset("CIFAR10")
+# size of calibration dataset is 10% of train set
+calib_size = int(dataset.num_train * 0.1)
+calib_set = wrapper.loader_to_tensor(dataset.train_loader)
+calib_loader = wrapper.tensor_to_loader(calib_set[0][: calib_size], calib_set[1][: calib_size])
+
+quantizer = TorchQuantizer(calib_loader=calib_loader)
+quanted = quantizer.compress(large)
 ```
-5. 模型性能评估（待重构）
-``` python
-# from toolkit.evaluate.metrics import Metric
-from toolkit.evaluate import Metric
 
-metric = Metric(dataset, dataset.test_loader, 10, use_gpu=True)
-# 实用：
-metric = Metric(None, test_loader, num_class=10)
+#### Knowledge Distillation
 
-print("flops and params: ", Metric.flops(resnet110, input_shape=(3, 32, 32)))
-# deprecated
-print(metric.acc(resnet110))
-print(metric.ece(resnet110))
+```python
+from toolkit.pipeline import KDTrainer
+import torch
 
-print(metric.accuracy(resnet110))
-print(metric.expect_calibration_error(resnet110))
-# 其他指标阅读源码
+large = get_network("resnet110", num_class=10, weight="xxx.pth")
+dataset = get_dataset("CIFAR10")
+student = get_network("resnet20", num_class=10)
 
+trainer = KDTrainer(
+    teacher=large,
+    alpha=0.8,
+    temperature=0.4,
+    num_epochs=200,
+    weight_decay=5e-4
+)
+student = trainer.train(student, dataset.train_loader, dataset.test_loader, optimizer="SGD")
 ```
-6. 其他方法
+
+## DiffFinder diagreements generation
+
 ``` python
-"""
-1 图片逆归一化和显示
-"""
-#　重构后包位置可能变化
-from toolkit.utils.disagreements.show import tensor_wrapper
-from  matplotlib import pyplot as plt
+from toolkit.se4ai.disagreements import CWDiffinder as DiffFinder
+from toolkit.evaluate import ModelMetric
 
-mean = dataset.normalize.mean
-std = dataset.normalize.std
+large = get_network("resnet110", 10, weight="xxx.pth")
+tiny = get_network("resnet20", 10, weight="yyy.pth")
 
-wrapper = tensor_wrapper(mean, std)
+difffinder = DiffFinder(
+    black_model=large,
+    white_model=tiny,
+    lamb=1,
+    steps=50,
+    lr=0.01,
+    normalization=(dataset.normalize.mean, dataset.normalize.std)
+)
 
-for X, y in test_loader:
-    images = X.to("cuda")
-    break
+# find agreements
+same_tensor = difffinder.find_images(
+    large, 
+    tiny, 
+    number=1000, 
+    test_loader=dataset.test_loader,
+    agreement=True
+)
 
-images = wrapper(images)
-# images可以用plt显示出来
-plt.imshow(images[0])
+# generate disagreements
+disagreements = difffinder.find(datasource=same_tensor)
+
+# compute success rate
+metric = ModelMetric(wrapper.to_loader(disagreements, same_tensor[1]))
+print(metric.disagree_rate(large, tiny))
+
 ```

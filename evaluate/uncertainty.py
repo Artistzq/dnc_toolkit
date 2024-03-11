@@ -62,7 +62,7 @@ class Uncertainty:
     @classmethod
     def get(cls, probs, method="entropy"):
         if method == "entropy":
-            return cls.entropy(probs, True)
+            return cls.entropy(probs, norm=True)
         elif method == "gini":
             return cls.gini(probs)
         elif method == "margin":

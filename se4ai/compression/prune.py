@@ -1,3 +1,4 @@
+import copy
 import torch
 import torch_pruning as tp
 
@@ -11,12 +12,14 @@ class Pruner(Compressor):
     def __init__(self, dataset, sparsity, iterative_steps=5, retrainer: Trainer=None, device="cuda") -> None:
         super().__init__()
         self.dataset = dataset
-        self.sparsity = sparsity
+        self.sparsity = sparsity 
         self.iterative_steps = iterative_steps
         self.retrainer = retrainer
         self.device = device
     
     def process(self, model):
+        large_model = copy.deepcopy(model)
+        model = large_model
         metric = ModelMetric(self.dataset.test_loader)
         shape = metric.get_shape()
         
@@ -26,6 +29,8 @@ class Pruner(Compressor):
         ignored_layers = []
         for module in model.modules():
             if isinstance(module, torch.nn.Linear) and module.out_features == self.dataset.num_classes:
+                ignored_layers.append(module)
+            if isinstance(module, torch.nn.Conv2d) and module.kernel_size == (1, 1) and module.stride == (1, 1) and module.out_channels == self.dataset.num_classes:
                 ignored_layers.append(module)
         # print(ignored_layers)
         
