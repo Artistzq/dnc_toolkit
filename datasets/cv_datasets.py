@@ -108,7 +108,7 @@ class ImageNet(Dataset):
             normalization = ([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 
         super(ImageNet, self).__init__(
-            224, 1000, 1281167, 50000, normalization, batch_size, num_workers
+            224, 1000, 50000, 1281167, normalization, batch_size, num_workers
         )
         self.augmented = transforms.Compose([
             transforms.Resize(256),
