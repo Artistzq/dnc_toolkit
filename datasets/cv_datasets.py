@@ -103,7 +103,7 @@ class TinyImageNet(Dataset):
 
 
 class ImageNet(Dataset):
-    def __init__(self, batch_size=256, num_workers=8, augmented=True, root="./data", normalization=None):
+    def __init__(self, batch_size=256, num_workers=8, augmented=True, root="/mnt/sda/yzq/data", normalization=None):
         if normalization is None:
             normalization = ([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 
@@ -122,8 +122,6 @@ class ImageNet(Dataset):
         train_dir = os.path.join(root, 'imagenet/train')
         valid_dir = os.path.join(root, 'imagenet/val')
         imagenet_root = os.path.join(root, "imagenet")
-        # TODO 加载真实训练集
-        self.trainset = datasets.ImageFolder(valid_dir, self.augmented)
-        
+        self.trainset = datasets.ImageFolder(train_dir, self.augmented)
         self.testset = datasets.ImageFolder(valid_dir, self.augmented)
         self.set_loader()
