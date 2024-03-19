@@ -7,7 +7,7 @@ from .cv_datasets import Dataset
 
 from .ood_datasets import get_corrupt_dataset
 
-
+# CIFAR10用了ImageNet的MEANSTD
 CIFAR10_MEAN_STD = ([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 CIFAR100_MEAN_STD = ([0.507, 0.487, 0.441], [0.267, 0.256, 0.276])
 TINY_IMAGENET_MEAN_STD = [0.4802,  0.4481,  0.3975], [0.2302, 0.2265, 0.2262]

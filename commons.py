@@ -29,6 +29,7 @@ from .visualize.radar import radar_chart
 from .se4ai.disagreements import DiffChaser, SameChaser, Diffinder, SameFinder, CWDiffinder, CWSameFinder
 from .se4ai.disagreements import CWDiffinder as DiffFinder
 from .se4ai.compression import Pruner, TorchQuantizer
+from .se4ai.disagreements.finder import Finder
 
 from .utils.context_manager import Timer
 from .utils.decorators import deprecated, printable, return_string
