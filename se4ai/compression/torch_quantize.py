@@ -1,7 +1,7 @@
 from .compressor import Compressor
 import torch
 import copy
-from torch.ao.quantization import quantize_fx, get_default_qconfig
+from torch.ao.quantization import quantize_fx, get_default_qconfig_mapping
 from torch import nn
 
 class TorchQuantizer(Compressor):
@@ -10,12 +10,19 @@ class TorchQuantizer(Compressor):
         super().__init__()
         self.calib_loader = calib_loader
         self.verbose = verbose
+        self.example_inputs = self.get_example_inputs()
         
     def compress(self, model):
         model = self.process(model)
         if self.archive:
             torch.save(model.state_dict(), self.archive.get_weight_path())
         return model
+    
+    def get_example_inputs(self, loader):
+        for X, y in loader:
+            inputs = X[: 1]
+            break
+        return inputs
     
     def process(self, model, ):
         calib_loader = self.calib_loader
@@ -26,8 +33,8 @@ class TorchQuantizer(Compressor):
         if self.verbose:
             print("Set quantization config...")
         # 设置量化方式
-        qconfig_dict = {"": get_default_qconfig(backend='fbgemm')}
-        model_prepare = quantize_fx.prepare_fx(model=model_prepare, qconfig_dict=qconfig_dict)
+        qconfig_mapping = {"": get_default_qconfig_mapping(backend='fbgemm')}
+        model_prepare = quantize_fx.prepare_fx(model=model_prepare, qconfig_mapping=qconfig_mapping, example_inputs=self.example_inputs)
         model_prepare.eval()
 
         if self.verbose:
@@ -50,14 +57,15 @@ class TorchQuantizer(Compressor):
         return quantized_model
     
     @classmethod
-    def load_model(self, raw_model, weight_path):
+    def load_model(cls, raw_model, weight_path, example_inputs_shape):
         model_prepare = copy.deepcopy(raw_model)
         model_prepare.eval()
         model_prepare = model_prepare.to("cpu")
+        example_inputs = torch.rand(example_inputs_shape)
         
         # 设置量化方式
-        qconfig_dict = {"": get_default_qconfig(backend='fbgemm')}
-        model_prepare = quantize_fx.prepare_fx(model=model_prepare, qconfig_dict=qconfig_dict)
+        qconfig_mapping = {"": get_default_qconfig_mapping(backend='fbgemm')}
+        model_prepare = quantize_fx.prepare_fx(model=model_prepare, qconfig_mapping=qconfig_mapping, example_inputs=example_inputs)
         model_prepare.eval()
 
         # 根据之前设置的量化方式以及标定计算的参数， 进行模型转换， FP32--> INT8
