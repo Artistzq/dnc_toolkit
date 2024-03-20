@@ -10,16 +10,16 @@ import torchvision
 
 class Dataset:
     
-    def __init__(self, img_size, num_classes, num_test, num_train, normalize, batch_size, num_workers):
+    def __init__(self, img_size, num_classes, num_test, num_train, normalization, batch_size, num_workers):
         self.img_size = img_size
         self.num_classes = num_classes
         self.num_test = num_test
         self.num_train = num_train
-        self.normalize = transforms.Normalize(mean=normalize[0], std=normalize[1])
+        self.normalize_transform = transforms.Normalize(mean=normalization[0], std=normalization[1])
         self.batch_size = batch_size
         self.num_workers = num_workers
         
-        self.normalized = transforms.Compose([transforms.ToTensor(), self.normalize])
+        self.test_transforms = transforms.Compose([transforms.ToTensor(), self.normalize_transform])
     
     def set_dataset(self, trainset, testset):
         self.trainset = trainset
@@ -38,12 +38,17 @@ class CIFAR10(Dataset):
         super(CIFAR10, self).__init__(
             32, 10, 10000, 50000, normalization, batch_size, num_workers
         )
-        self.augmented = transforms.Compose([transforms.RandomHorizontalFlip(), transforms.RandomCrop(self.img_size, padding=4),transforms.ToTensor(), self.normalize])
+        self.train_transforms = transforms.Compose([
+            transforms.RandomHorizontalFlip(), 
+            transforms.RandomCrop(self.img_size, padding=4),
+            transforms.ToTensor(), 
+            self.normalize_transform
+            ])
         if not augmented:
-            self.augmented = self.normalized
+            self.train_transforms = self.test_transforms
 
-        self.trainset =  datasets.CIFAR10(root=root, train=True, download=True, transform=self.augmented)
-        self.testset =  datasets.CIFAR10(root=root, train=False, download=True, transform=self.normalized)
+        self.trainset =  datasets.CIFAR10(root=root, train=True, download=True, transform=self.train_transforms)
+        self.testset =  datasets.CIFAR10(root=root, train=False, download=True, transform=self.test_transforms)
 
         self.set_loader()
 
@@ -56,12 +61,17 @@ class CIFAR100(Dataset):
         super(CIFAR100, self).__init__(
             32, 100, 10000, 50000, normalization, batch_size, num_workers
         )
-        self.augmented = transforms.Compose([transforms.RandomHorizontalFlip(), transforms.RandomCrop(self.img_size, padding=4),transforms.ToTensor(), self.normalize])
+        self.train_transforms = transforms.Compose([
+            transforms.RandomHorizontalFlip(), 
+            transforms.RandomCrop(self.img_size, padding=4),
+            transforms.ToTensor(), 
+            self.normalize_transform
+            ])
         if not augmented:
-            self.augmented = self.normalized
+            self.train_transforms = self.test_transforms
     
-        self.trainset =  datasets.CIFAR100(root=root, train=True, download=True, transform=self.augmented)
-        self.testset =  datasets.CIFAR100(root=root, train=False, download=True, transform=self.normalized)
+        self.trainset =  datasets.CIFAR100(root=root, train=True, download=True, transform=self.train_transforms)
+        self.testset =  datasets.CIFAR100(root=root, train=False, download=True, transform=self.test_transforms)
         
         self.set_loader()
 
@@ -74,12 +84,17 @@ class SVHN(Dataset):
         super(SVHN, self).__init__(
             32, 10, 26032, 73257, normalization, batch_size, num_workers
         )
-        self.augmented = transforms.Compose([transforms.RandomHorizontalFlip(), transforms.RandomCrop(32, padding=4),transforms.ToTensor(), self.normalize]) 
+        self.train_transforms = transforms.Compose([
+            transforms.RandomHorizontalFlip(), 
+            transforms.RandomCrop(32, padding=4),
+            transforms.ToTensor(), 
+            self.normalize_transform
+            ]) 
         if not augmented:
-            self.augmented = self.normalized
+            self.train_transforms = self.test_transforms
         
-        self.trainset =  datasets.SVHN(root=root, split="train", download=True, transform=self.augmented)
-        self.testset =  datasets.SVHN(root=root, split="test", download=True, transform=self.normalized)
+        self.trainset =  datasets.SVHN(root=root, split="train", download=True, transform=self.train_transforms)
+        self.testset =  datasets.SVHN(root=root, split="test", download=True, transform=self.test_transforms)
         self.set_loader()
 
 
@@ -91,14 +106,20 @@ class TinyImageNet(Dataset):
         super(TinyImageNet, self).__init__(
             64, 200, 10000, 100000, normalization, batch_size, num_workers
         )
-        self.augmented = transforms.Compose([transforms.RandomHorizontalFlip(), transforms.RandomCrop(self.img_size, padding=8), transforms.ColorJitter(0.2, 0.2, 0.2), transforms.ToTensor(), self.normalize])
+        self.train_transforms = transforms.Compose([
+            transforms.RandomHorizontalFlip(), 
+            transforms.RandomCrop(self.img_size, padding=8), 
+            transforms.ColorJitter(0.2, 0.2, 0.2), 
+            transforms.ToTensor(), 
+            self.normalize_transform
+            ])
         if not augmented:
-            self.augmented = self.normalized
+            self.train_transforms = self.test_transforms
         
         train_dir = os.path.join(root, 'tiny-imagenet-200/train')
         valid_dir = os.path.join(root, 'tiny-imagenet-200/val/images')
-        self.trainset =  datasets.ImageFolder(train_dir, transform=self.augmented)
-        self.testset =  datasets.ImageFolder(valid_dir, transform=self.normalized)
+        self.trainset =  datasets.ImageFolder(train_dir, transform=self.train_transforms)
+        self.testset =  datasets.ImageFolder(valid_dir, transform=self.test_transforms)
         self.set_loader()
 
 
@@ -110,18 +131,23 @@ class ImageNet(Dataset):
         super(ImageNet, self).__init__(
             224, 1000, 50000, 1281167, normalization, batch_size, num_workers
         )
-        self.augmented = transforms.Compose([
+
+        self.train_transforms = transforms.Compose([
             transforms.Resize(256),
             transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            self.normalize
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(), 
+            self.normalize_transform
         ])
         if not augmented:
-            self.augmented = self.normalized
+            self.train_transforms = self.test_transforms
 
         train_dir = os.path.join(root, 'imagenet/train')
         valid_dir = os.path.join(root, 'imagenet/val')
-        imagenet_root = os.path.join(root, "imagenet")
-        self.trainset = datasets.ImageFolder(train_dir, self.augmented)
-        self.testset = datasets.ImageFolder(valid_dir, self.augmented)
+        
+        print("==> !!! Warning: use valid set as train set in ImageNet. Comment `train_dir = valid_dir` to Recover.")
+        train_dir = valid_dir
+        
+        self.trainset = datasets.ImageFolder(train_dir, self.train_transforms)
+        self.testset = datasets.ImageFolder(valid_dir, self.test_transforms)
         self.set_loader()
