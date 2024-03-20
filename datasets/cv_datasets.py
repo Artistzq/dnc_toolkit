@@ -131,7 +131,15 @@ class ImageNet(Dataset):
         super(ImageNet, self).__init__(
             224, 1000, 50000, 1281167, normalization, batch_size, num_workers
         )
-
+        
+        # 与父类 test_transforms 不同
+        self.test_transforms = transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(), 
+            self.normalize_transform
+        ])
+        
         self.train_transforms = transforms.Compose([
             transforms.Resize(256),
             transforms.CenterCrop(224),
